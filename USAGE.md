@@ -103,11 +103,15 @@ logs/panel.log             面板自身日志
 - 面板在 steamcmd 目录下的 `steamapps/common/*Starve*Dedicated Server` 中查找
   `dontstarve_dedicated_server_nullrenderer`，也兼容直接放在 steamcmd 目录内。
 - 启动时按集群目录生成命令并保存到 `dst/<id>/meta.json` 的 `launchArgs`：
-  `-persistent_storage_root <集群目录上两级> -conf_dir <上一级名> -cluster <目录名> -shard <Master|Caves> -console`
+  `-persistent_storage_root <root> -conf_dir <conf> -cluster <目录名> -shard <Master|Caves> -console`。
+  真实路径通常是 `...\Klei\DoNotStarveTogether\<账号ID>\Cluster_2`，
+  其中 `<账号ID>` 由游戏自动插入，面板会跳过它（不会把它当成 `-conf_dir`）。
 - 工作目录 = 游戏根目录，环境变量自动带 `SteamAppId=322330`、`SteamGameId=322330`；
   不依赖面板 exe 位置，移动程序目录不受影响。
+- 启动前检查 `server_port` / `master_port` 的 UDP 占用，被占用会直接提示；
+- Master 先启动，确认进程存活 2s 后再启动 Caves；
 - 分片用 `CREATE_NO_WINDOW` 启动，**不弹黑框**；stdout/stderr 写入
-  `logs/dst-<id>.log`，游戏自身日志在各分片 `server_log.txt`。
+  `logs/dst-<id>.log`（含 cwd/参数），游戏自身日志在各分片 `server_log.txt`。
 - **停止**：向每个分片 stdin 发送 `c_shutdown()`，最多等 10s，未退再结束进程树。
 
 详情“状态”里能看到实际执行的命令。
@@ -232,6 +236,8 @@ VERSION=0.2.1 ./build.sh
 | 更新状态长期“更新中” | steamcmd 可能在校验/自我更新；看下方日志，超过 30 分钟会超时 |
 | DST 没识别到世界 | 世界目录里缺少 `server.ini`；面板只认带该文件的一级子目录 |
 | DST 停止后还有进程 | 发送 `c_shutdown()` 后 10s 仍存活会杀进程树；若分片不读 stdin，直接走强杀 |
+| 启动报“UDP 端口已被占用” | 旧服务器/其它程序占着端口；先在任务管理器结束旧的 DST 进程 |
+| 日志出现 `CFileWriterThread` Assertion | 通常是进程提前退出后的次生错误；先看日志更上面的配置/路径错误，并确认端口未被占用 |
 | 面板端口被其他程序占用 | 弹错误对话框；改 `conf/panel.json` 的 `listen` 或加 `-listen` 换端口 |
 | 代理状态 `port not allowed` | 该 remotePort 不在 frps 的 `allowPorts` 内 |
 | dashboard 401 | 用 TOML 里的 `webServer.user/password`；默认 admin |

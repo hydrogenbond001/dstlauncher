@@ -57,7 +57,7 @@ func (p *Proc) StartEnv(bin string, args []string, dir string, extraEnv []string
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(lf, "\n=== start %s: %s %v ===\n", time.Now().Format(time.RFC3339), filepath.Base(bin), args)
+	fmt.Fprintf(lf, "\n=== start %s: %s %v (cwd=%s) ===\n", time.Now().Format(time.RFC3339), filepath.Base(bin), args, dir)
 
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = dir

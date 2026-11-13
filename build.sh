@@ -6,7 +6,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-VERSION="${VERSION:-0.5.0}"
+VERSION="${VERSION:-0.5.1}"
 FRP_VERSION="${FRP_VERSION:-0.71.1}"
 OUT="${OUT:-dist}"
 CACHE="$OUT/.cache"

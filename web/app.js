@@ -12,6 +12,7 @@ let logSource = 'launcher';
 let dstConfigData = null;
 let stopped = false;
 let steamBusy = false;
+let steamLogDismissed = false;
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -593,12 +594,20 @@ async function loadSteamStatus() {
     const st = await api('/api/steamcmd/status');
     const status = $('#steamStatus');
     status.className = 'hint';
+    status.title = '';
     if (st.running) {
+      steamLogDismissed = false;
       status.textContent = `更新中… ${st.elapsed || 0}s`;
       status.classList.add('warn');
     } else if (st.success) {
-      status.textContent = 'Success! 更新完成';
       status.classList.add('ok-text');
+      if (steamLogDismissed) {
+        status.textContent = 'Success! 更新完成';
+      } else {
+        status.textContent = 'Success! 更新完成（点击关闭日志）';
+        status.classList.add('clickable');
+        status.title = '点击关闭日志窗口';
+      }
     } else if (st.error) {
       status.textContent = st.error;
       status.classList.add('warn');
@@ -616,10 +625,12 @@ async function loadSteamStatus() {
 
     const log = $('#steamLog');
     const lines = st.lines || [];
-    if (lines.length) {
+    if (lines.length && !steamLogDismissed) {
       log.hidden = false;
       log.textContent = lines.join('\n');
       log.scrollTop = log.scrollHeight;
+    } else if (steamLogDismissed) {
+      log.hidden = true;
     }
     if (!st.running && steamBusy) {
       steamBusy = false;
@@ -644,10 +655,21 @@ $('#saveSteamcmd').addEventListener('click', async () => {
   }
 });
 
+$('#steamStatus').addEventListener('click', () => {
+  const status = $('#steamStatus');
+  if (!status.classList.contains('clickable')) return;
+  steamLogDismissed = true;
+  $('#steamLog').hidden = true;
+  status.classList.remove('clickable');
+  status.title = '';
+  status.textContent = 'Success! 更新完成';
+});
+
 $('#updateSteamcmd').addEventListener('click', async () => {
   if (!confirm('将运行 steamcmd 更新 343050（可能较久，期间请勿关闭），继续？')) return;
   try {
     steamBusy = true;
+    steamLogDismissed = false;
     $('#steamLog').hidden = false;
     $('#steamLog').textContent = '等待 steamcmd 启动...';
     await api('/api/steamcmd/update', { method: 'POST' });

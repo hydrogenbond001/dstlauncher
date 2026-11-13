@@ -61,6 +61,26 @@ func TestLaunchArgs(t *testing.T) {
 	}
 }
 
+func TestLaunchArgsAccountIDLayer(t *testing.T) {
+	cluster := filepath.Join("data", "Klei", "DoNotStarveTogether", "1476217985", "Cluster_2")
+	abs, err := filepath.Abs(cluster)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Dir(filepath.Dir(filepath.Dir(abs)))
+	args := LaunchArgs(cluster, "Caves")
+	want := []string{
+		"-persistent_storage_root", root,
+		"-conf_dir", "DoNotStarveTogether",
+		"-cluster", "Cluster_2",
+		"-shard", "Caves",
+		"-console",
+	}
+	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
+		t.Errorf("LaunchArgs = %v, want %v", args, want)
+	}
+}
+
 func TestWriteConfigPreservesUnknownKeysAndCRLF(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "Master"), 0o755); err != nil {

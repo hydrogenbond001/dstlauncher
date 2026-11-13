@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -676,12 +677,14 @@ func (s *Server) frpProc(id string) *unit.Proc { return s.proc(id, id) }
 func (s *Server) dstProc(id string) *unit.Proc { return s.proc("dst:"+id, "dst-"+id) }
 
 type dstShardView struct {
-	Name     string `json:"name"`
-	Dir      string `json:"dir"`
-	IsMaster bool   `json:"isMaster"`
-	Port     int    `json:"port"`
-	Running  bool   `json:"running"`
-	PID      int    `json:"pid,omitempty"`
+	Name      string `json:"name"`
+	Dir       string `json:"dir"`
+	IsMaster  bool   `json:"isMaster"`
+	Port      int    `json:"port"`
+	Running   bool   `json:"running"`
+	PID       int    `json:"pid,omitempty"`
+	ExitAt    string `json:"exitAt,omitempty"`
+	LastError string `json:"lastError,omitempty"`
 }
 
 type dstView struct {
@@ -718,7 +721,7 @@ func (s *Server) dstView(p store.DSTProfile) dstView {
 		st := s.dstShardProc(p.ID, sh.Name).Status()
 		v.Shards = append(v.Shards, dstShardView{
 			Name: sh.Name, Dir: sh.Dir, IsMaster: sh.IsMaster, Port: sh.Port,
-			Running: st.Running, PID: st.PID,
+			Running: st.Running, PID: st.PID, ExitAt: st.ExitAt, LastError: st.LastError,
 		})
 		if st.Running {
 			v.Running = true
@@ -951,6 +954,11 @@ func (s *Server) startDST(p store.DSTProfile) error {
 	if updating {
 		return errors.New("steamcmd 正在更新，请稍后再启动")
 	}
+
+	cfg, err := dstpkg.ReadConfig(p.ClusterDir)
+	if err != nil {
+		return err
+	}
 	shards, err := dstpkg.DetectShards(p.ClusterDir)
 	if err != nil || len(shards) == 0 {
 		return fmt.Errorf("集群目录里没有可用的世界: %s", p.ClusterDir)
@@ -958,12 +966,31 @@ func (s *Server) startDST(p store.DSTProfile) error {
 	if s.dstView(p).Running {
 		return errors.New("实例已在运行")
 	}
+
+	ports := make([]int, 0, len(shards)+1)
+	for _, sh := range shards {
+		if sh.Port > 0 {
+			ports = append(ports, sh.Port)
+		}
+	}
+	if len(shards) > 1 && cfg.Cluster.MasterPort > 0 {
+		ports = append(ports, cfg.Cluster.MasterPort)
+	}
+	if busy := busyUDPPorts(ports); len(busy) > 0 {
+		return fmt.Errorf("UDP 端口已被占用: %v（可能旧服务器还在运行，先在任务管理器结束它）", busy)
+	}
+
 	installRoot, exe, err := dstpkg.FindServer(s.paths.Settings.SteamCmdDir)
 	if err != nil {
 		return err
 	}
 
 	var started []*unit.Proc
+	rollback := func() {
+		for _, pr := range started {
+			_ = pr.Stop(3 * time.Second)
+		}
+	}
 	for _, sh := range shards {
 		proc := s.dstShardProc(p.ID, sh.Name)
 		if proc.Running() {
@@ -971,17 +998,51 @@ func (s *Server) startDST(p store.DSTProfile) error {
 		}
 		args := dstpkg.LaunchArgs(p.ClusterDir, sh.Name)
 		if err := proc.StartEnv(exe, args, installRoot, dstpkg.LaunchEnv()); err != nil {
-			for _, pr := range started {
-				_ = pr.Stop(2 * time.Second)
-			}
+			rollback()
 			return fmt.Errorf("%s: %w", filepath.Base(sh.Name), err)
 		}
 		started = append(started, proc)
+
+		// DST expects the master shard to be up before caves joins it.
+		if sh.IsMaster {
+			time.Sleep(2 * time.Second)
+			if st := proc.Status(); !st.Running {
+				rollback()
+				if st.LastError == "" {
+					return errors.New("Master 启动后立即退出，查看启动日志")
+				}
+				return fmt.Errorf("Master 启动后退出: %s", st.LastError)
+			}
+		}
 	}
 	if len(started) == 0 {
 		return errors.New("没有启动任何分片")
 	}
 	return nil
+}
+
+func udpPortFree(port int) bool {
+	conn, err := net.ListenPacket("udp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+func busyUDPPorts(ports []int) []int {
+	var busy []int
+	seen := map[int]bool{}
+	for _, port := range ports {
+		if port <= 0 || port > 65535 || seen[port] {
+			continue
+		}
+		seen[port] = true
+		if !udpPortFree(port) {
+			busy = append(busy, port)
+		}
+	}
+	return busy
 }
 
 func (s *Server) stopDST(p store.DSTProfile) {

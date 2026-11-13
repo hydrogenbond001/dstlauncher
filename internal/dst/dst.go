@@ -271,16 +271,24 @@ func serverExeCandidates() []string {
 }
 
 // LaunchArgs builds the shard command from the cluster directory, so the
-// panel never needs a bat and does not depend on its own location:
-// <clusterDir> is <persistent_storage_root>/<conf_dir>/<cluster>.
+// panel never needs a bat and does not depend on its own location.
+//
+// DST's real layout is <persistent_storage_root>/<conf_dir>/<accountID>/<cluster>
+// where <accountID> is inserted by the game itself and must NOT be passed as
+// -conf_dir; doing so makes the server look in <accountID>/<accountID>/<cluster>
+// and fail with a tier0 assertion during early shutdown.
 func LaunchArgs(clusterDir, shard string) []string {
 	abs, err := filepath.Abs(clusterDir)
 	if err == nil {
 		clusterDir = abs
 	}
-	root := filepath.Dir(filepath.Dir(clusterDir))
-	confDir := filepath.Base(filepath.Dir(clusterDir))
 	cluster := filepath.Base(clusterDir)
+	confDir := filepath.Base(filepath.Dir(clusterDir))
+	root := filepath.Dir(filepath.Dir(clusterDir))
+	if numericName(confDir) {
+		confDir = filepath.Base(root)
+		root = filepath.Dir(root)
+	}
 	args := []string{
 		"-persistent_storage_root", root,
 		"-conf_dir", confDir,
@@ -290,6 +298,18 @@ func LaunchArgs(clusterDir, shard string) []string {
 		args = append(args, "-shard", shard)
 	}
 	return append(args, "-console")
+}
+
+func numericName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func LaunchEnv() []string {
