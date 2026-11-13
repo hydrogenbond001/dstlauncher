@@ -64,7 +64,8 @@ go build -o frp-console .
 首次构建还需要 Go 模块网络（拉取托盘依赖），或提前 `GOOS=windows go mod download`。
 
 - 直连 GitHub 失败时自动尝试 `FRP_MIRROR`（默认 `https://ghfast.top/`，置空可关闭）。
-- 完全离线：把官方 zip 解压到 `dist/.cache/frp_<ver>_<os>_<arch>/` 再执行构建。
+- 完全离线：把官方发布包（Windows `.zip`，其它平台 `.tar.gz`）解压到
+  `dist/.cache/frp_<ver>_<os>_<arch>/` 再执行构建。
 - macOS：先把 `frp_0.71.1_darwin_arm64.zip` 放进缓存，再在 `TARGETS` 里加
   `"darwin arm64"`。
 

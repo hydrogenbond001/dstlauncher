@@ -30,6 +30,7 @@ need go
 need curl
 need unzip
 need gzip
+need tar
 
 # download <url> <dest>: direct first, then mirror; aborts stalled transfers.
 download() {
@@ -54,7 +55,14 @@ download() {
 fetch_frp() {
   local os="$1" arch="$2"
   local dir="$CACHE/frp_${FRP_VERSION}_${os}_${arch}"
-  local zip="$CACHE/frp_${FRP_VERSION}_${os}_${arch}.zip"
+  local archive ext
+  # frp ships .zip for Windows, .tar.gz for every other platform.
+  if [[ "$os" == "windows" ]]; then
+    ext="zip"
+  else
+    ext="tar.gz"
+  fi
+  archive="$CACHE/frp_${FRP_VERSION}_${os}_${arch}.${ext}"
 
   if [[ -x "$dir/frpc" || -f "$dir/frpc.exe" ]]; then
     echo "$dir"
@@ -62,13 +70,16 @@ fetch_frp() {
   fi
 
   mkdir -p "$CACHE"
-  if [[ ! -f "$zip" ]]; then
+  if [[ ! -f "$archive" ]]; then
     download \
-      "https://github.com/fatedier/frp/releases/download/v${FRP_VERSION}/frp_${FRP_VERSION}_${os}_${arch}.zip" \
-      "$zip"
+      "https://github.com/fatedier/frp/releases/download/v${FRP_VERSION}/frp_${FRP_VERSION}_${os}_${arch}.${ext}" \
+      "$archive"
   fi
   rm -rf "$dir"
-  unzip -q -o "$zip" -d "$CACHE"
+  case "$archive" in
+    *.zip) unzip -q -o "$archive" -d "$CACHE" ;;
+    *.tar.gz) tar -xzf "$archive" -C "$CACHE" ;;
+  esac
   echo "$dir"
 }
 
