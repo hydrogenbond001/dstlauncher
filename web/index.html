@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>frp console</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>frp console</h1>
+      <span id="version" class="chip"></span>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="frp">frp 实例</button>
+      <button class="nav-item" data-view="dst">DST 服务器</button>
+    </nav>
+    <div class="sidebar-foot">
+      <div id="root" class="small muted"></div>
+      <div id="listen" class="small muted"></div>
+      <button id="quitPanel" class="ghost danger">退出面板</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="main-head">
+      <div>
+        <h2 id="viewTitle">frp 实例</h2>
+        <p id="viewHint" class="small muted"></p>
+      </div>
+      <div class="head-tools">
+        <div id="steamBar" class="steam-bar" hidden>
+          <input id="steamcmdDir" placeholder="steamcmd 目录">
+          <button id="saveSteamcmd" class="ghost">保存</button>
+          <button id="updateSteamcmd" class="primary">更新服务端</button>
+          <span id="steamStatus" class="hint"></span>
+        </div>
+        <button id="newBtn" class="primary">+ 新建 frp 实例</button>
+      </div>
+    </header>
+
+    <pre id="steamLog" class="steam-log" hidden></pre>
+    <div id="banner" class="banner" hidden></div>
+
+    <div class="workspace">
+      <section class="list-pane">
+        <div id="list"></div>
+      </section>
+
+      <section class="detail-pane">
+        <div id="placeholder" class="placeholder">
+          从左侧选择一个实例
+          <span class="small muted">配置、日志与状态显示在这里</span>
+        </div>
+
+        <div id="detail" hidden>
+          <div class="detail-head">
+            <div class="detail-title">
+              <h3 id="detailTitle"></h3>
+              <div id="detailSub" class="small muted mono"></div>
+            </div>
+            <div class="actions">
+              <button id="dashLink" class="ghost" hidden>dashboard</button>
+              <button id="closeDetail" class="ghost">关闭</button>
+            </div>
+          </div>
+
+          <div class="tabs" id="tabs"></div>
+
+          <div class="tab-body" id="tab-config">
+            <div id="frpConfig">
+              <div class="actions">
+                <span id="configPath" class="hint mono ellipsis"></span>
+                <button id="saveConfig" class="primary">保存并校验</button>
+              </div>
+              <textarea id="configText" spellcheck="false"></textarea>
+            </div>
+
+            <div id="dstConfig" hidden>
+              <div class="actions">
+                <span id="dstConfigHint" class="hint">只修改下面这些常用项，其余内容保持原样</span>
+                <button id="saveDstConfig" class="primary">保存配置</button>
+              </div>
+              <div id="dstConfigFields"></div>
+            </div>
+          </div>
+
+          <div class="tab-body" id="tab-logs" hidden>
+            <div class="actions">
+              <span class="hint">每 1.5s 增量刷新</span>
+              <span id="logSources" class="log-sources"></span>
+            </div>
+            <pre id="logText"></pre>
+          </div>
+
+          <div class="tab-body" id="tab-status" hidden>
+            <pre id="statusText"></pre>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<dialog id="createDialog">
+  <form id="createForm" autocomplete="off">
+    <div class="dialog-head">
+      <h2 id="createTitle">新建实例</h2>
+      <button type="button" id="closeCreate" class="ghost" aria-label="关闭">×</button>
+    </div>
+
+    <div id="frpFields">
+      <div class="row">
+        <label>名称 <input name="name" required placeholder="dst-tunnel"></label>
+        <label>类型
+          <select name="kind" id="kind">
+            <option value="client">frpc 客户端</option>
+            <option value="server">frps 服务端</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="clientFields">
+        <div class="row">
+          <label>serverAddr <input name="serverAddr" value="127.0.0.1"></label>
+          <label>serverPort <input type="number" name="serverPort" value="7000" min="1" max="65535"></label>
+          <label>token <input name="token" type="password"></label>
+          <label>面板端口 <input type="number" name="webPort" value="7400" min="1" max="65535"></label>
+          <label>面板密码 <input name="webPass" id="webPass"></label>
+        </div>
+        <div class="proxy-head">
+          <span>代理</span>
+          <button type="button" id="addProxy" class="ghost">+ 添加代理</button>
+        </div>
+        <div id="proxies"></div>
+      </div>
+
+      <div id="serverFields" hidden>
+        <div class="row">
+          <label>bindPort <input type="number" name="bindPort" value="7000" min="1" max="65535"></label>
+          <label>token <input name="tokenS" type="password"></label>
+          <label>面板端口 <input type="number" name="webPortS" value="7500" min="1" max="65535"></label>
+          <label>面板密码 <input name="webPassS" id="webPassS"></label>
+          <label>allowPorts <input name="allowPorts" placeholder="80,10000-12000"></label>
+        </div>
+      </div>
+    </div>
+
+    <div id="dstFields" hidden>
+      <div class="row">
+        <label>名称 <input name="dstName" required placeholder="饥荒主服"></label>
+        <label>集群目录 <input name="clusterDir" required placeholder="...\DoNotStarveTogether\Cluster_2"></label>
+      </div>
+      <p class="hint">目录内的 Master / Caves 会自动识别。启动时通过上方 steamcmd 目录定位服务端，
+        自动设置 SteamAppId 并在游戏根目录执行开服命令；命令按集群目录生成并保存在实例文件里。</p>
+    </div>
+
+    <div class="actions dialog-actions">
+      <button type="submit" class="primary">创建</button>
+      <span id="createHint" class="hint"></span>
+    </div>
+  </form>
+</dialog>
+
+<template id="proxyRow">
+  <div class="proxy-row">
+    <input class="p-name" placeholder="名称">
+    <select class="p-type">
+      <option>tcp</option><option>udp</option><option>http</option><option>https</option>
+      <option>stcp</option><option>xtcp</option><option>sudp</option><option>tcpmux</option>
+    </select>
+    <input class="p-ip" value="127.0.0.1" placeholder="localIP">
+    <input class="p-local" type="number" placeholder="localPort" min="1" max="65535">
+    <input class="p-remote" type="number" placeholder="remotePort" min="1" max="65535">
+    <input class="p-domains" placeholder="域名,逗号分隔" hidden>
+    <input class="p-secret" placeholder="secretKey" hidden>
+    <button type="button" class="ghost remove">删除</button>
+  </div>
+</template>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# build output / caches
+dist/
+devdata/
+*.log
+
+# runtime data (created next to the executable)
+/conf/
+/profiles/
+/dst/
+/logs/
+/bin/
+
+# local reference files / OS noise
+/launch_cluster_2.bat
+.DS_Store
+Thumbs.db
+
+# generated embed staging (real .gz files are build inputs)
+internal/embedfs/bin/*.gz
