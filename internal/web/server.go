@@ -980,10 +980,14 @@ func (s *Server) startDST(p store.DSTProfile) error {
 		return fmt.Errorf("UDP 端口已被占用: %v（可能旧服务器还在运行，先在任务管理器结束它）", busy)
 	}
 
-	installRoot, exe, err := dstpkg.FindServer(s.paths.Settings.SteamCmdDir)
+	_, exe, err := dstpkg.FindServer(s.paths.Settings.SteamCmdDir)
 	if err != nil {
 		return err
 	}
+	// DST resolves data bundles relative to the working directory; it must be
+	// the directory holding the executable (bin/bin64), not the game root,
+	// otherwise every databundles/*.zip is "skipped" and main.lua fails.
+	launchDir := filepath.Dir(exe)
 
 	var started []*unit.Proc
 	rollback := func() {
@@ -997,7 +1001,7 @@ func (s *Server) startDST(p store.DSTProfile) error {
 			continue
 		}
 		args := dstpkg.LaunchArgs(p.ClusterDir, sh.Name)
-		if err := proc.StartEnv(exe, args, installRoot, dstpkg.LaunchEnv()); err != nil {
+		if err := proc.StartEnv(exe, args, launchDir, dstpkg.LaunchEnv()); err != nil {
 			rollback()
 			return fmt.Errorf("%s: %w", filepath.Base(sh.Name), err)
 		}

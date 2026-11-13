@@ -236,6 +236,7 @@ VERSION=0.2.1 ./build.sh
 | 更新状态长期“更新中” | steamcmd 可能在校验/自我更新；看下方日志，超过 30 分钟会超时 |
 | DST 没识别到世界 | 世界目录里缺少 `server.ini`；面板只认带该文件的一级子目录 |
 | DST 停止后还有进程 | 发送 `c_shutdown()` 后 10s 仍存活会杀进程树；若分片不读 stdin，直接走强杀 |
+| 日志 `databundles/*.zip skipped` 且 `main.lua` 加载失败 | 工作目录必须是对应 `bin`/`bin64`（0.5.2 起已按 exe 所在目录启动） |
 | 启动报“UDP 端口已被占用” | 旧服务器/其它程序占着端口；先在任务管理器结束旧的 DST 进程 |
 | 日志出现 `CFileWriterThread` Assertion | 通常是进程提前退出后的次生错误；先看日志更上面的配置/路径错误，并确认端口未被占用 |
 | 面板端口被其他程序占用 | 弹错误对话框；改 `conf/panel.json` 的 `listen` 或加 `-listen` 换端口 |
