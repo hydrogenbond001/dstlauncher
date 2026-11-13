@@ -1,0 +1,81 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FRP_VERSION: "0.71.1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+
+      - name: Vet and test
+        run: |
+          go vet ./...
+          go test ./...
+
+      # frp release zips are only build inputs; cache them across runs.
+      - name: Cache frp releases
+        uses: actions/cache@v4
+        with:
+          path: dist/.cache
+          key: frp-${{ env.FRP_VERSION }}
+
+      - name: Build portable packages
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.5.0-dev.${GITHUB_SHA:0:7}"
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          VERSION="$VERSION" ./build.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frp-console-${{ github.sha }}
+          path: dist/frp-console_*
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp dist/frp-console_windows_amd64/frp-console.exe \
+            "release-assets/frp-console-${VERSION}-windows-amd64.exe"
+          cp dist/frp-console_linux_amd64/frp-console \
+            "release-assets/frp-console-${VERSION}-linux-amd64"
+          cp dist/frp-console_linux_amd64/LICENSE-frp.txt release-assets/LICENSE-frp.txt
+
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "frp-console ${VERSION}" \
+              --generate-notes
+          gh release upload "${GITHUB_REF_NAME}" release-assets/* --clobber

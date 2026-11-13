@@ -68,6 +68,24 @@ go build -o frp-console .
 - macOS：先把 `frp_0.71.1_darwin_arm64.zip` 放进缓存，再在 `TARGETS` 里加
   `"darwin arm64"`。
 
+## 发布（GitHub Actions）
+
+`.github/workflows/build.yml`：
+
+- push `main`：`go vet` + `go test` → 构建 linux/windows → 上传 artifacts；
+- push `v*` tag：额外创建/更新 GitHub Release，附
+  `frp-console-<ver>-windows-amd64.exe`、`frp-console-<ver>-linux-amd64`。
+- release 任务需要 `contents: write`（工作流已声明），使用内置 `GITHUB_TOKEN`。
+
+裁剪版本：
+
+```bash
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+约 2-4 分钟后在 Actions 和 Releases 里能看到结果。
+
 ## 运行
 
 ```bash
