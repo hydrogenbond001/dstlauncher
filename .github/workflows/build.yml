@@ -57,8 +57,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: frp-console-${{ github.sha }}
-          path: dist/frp-console_*
+          name: dstlauncher-${{ github.sha }}
+          path: dist/dstlauncher_*
           if-no-files-found: error
 
       - name: Publish release
@@ -68,14 +68,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          cp dist/frp-console_windows_amd64/frp-console.exe \
-            "release-assets/frp-console-${VERSION}-windows-amd64.exe"
-          cp dist/frp-console_linux_amd64/frp-console \
-            "release-assets/frp-console-${VERSION}-linux-amd64"
-          cp dist/frp-console_linux_amd64/LICENSE-frp.txt release-assets/LICENSE-frp.txt
+          cp dist/dstlauncher_windows_amd64/dstlauncher.exe \
+            "release-assets/dstlauncher-${VERSION}-windows-amd64.exe"
+          cp dist/dstlauncher_linux_amd64/dstlauncher \
+            "release-assets/dstlauncher-${VERSION}-linux-amd64"
+          cp dist/dstlauncher_linux_amd64/LICENSE-frp.txt release-assets/LICENSE-frp.txt
 
           gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
             gh release create "${GITHUB_REF_NAME}" \
-              --title "frp-console ${VERSION}" \
+              --title "dstlauncher ${VERSION}" \
               --generate-notes
           gh release upload "${GITHUB_REF_NAME}" release-assets/* --clobber

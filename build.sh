@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds portable, self-contained frp-console executables per platform.
+# Builds portable, self-contained dstlauncher executables per platform.
 # Each output embeds that platform's frpc/frps (gzipped), so the exe alone is
 # enough: on first run it creates conf/, profiles/, logs/, bin/ next to itself.
 set -euo pipefail
@@ -105,7 +105,7 @@ for target in "${TARGETS[@]}"; do
   gzip -9 -c "$frpdir/frpc$ext" > "$EMBED_DIR/frpc$ext.gz"
   gzip -9 -c "$frpdir/frps$ext" > "$EMBED_DIR/frps$ext.gz"
 
-  outdir="$OUT/frp-console_${os}_${arch}"
+  outdir="$OUT/dstlauncher_${os}_${arch}"
   mkdir -p "$outdir"
   # frp ships under Apache-2.0; keep its license next to the embedded binaries.
   cp "$frpdir/LICENSE" "$outdir/LICENSE-frp.txt"
@@ -116,12 +116,12 @@ for target in "${TARGETS[@]}"; do
     ldflags="$ldflags -H=windowsgui"
   fi
 
-  echo ">> build ${os}/${arch} -> ${outdir}/frp-console${ext}"
+  echo ">> build ${os}/${arch} -> ${outdir}/dstlauncher${ext}"
   CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
     -ldflags "$ldflags" \
-    -o "$outdir/frp-console${ext}" .
+    -o "$outdir/dstlauncher${ext}" .
 done
 
 echo
 echo "done:"
-ls -lh "$OUT"/frp-console_*/frp-console* 2>/dev/null
+ls -lh "$OUT"/dstlauncher_*/dstlauncher* 2>/dev/null

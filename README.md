@@ -35,7 +35,7 @@
 ## 数据布局
 
 ```text
-frp-console(.exe)          # 唯一需要分发的文件
+dstlauncher(.exe)          # 唯一需要分发的文件
 conf/panel.json            # 监听地址 / 是否自动开浏览器
 bin/frpc, bin/frps         # 首次运行从 exe 内释放；可手工替换
 profiles/<id>/
@@ -52,11 +52,11 @@ logs/panel.log             # 面板自身日志（Windows GUI 构建唯一启动
 
 ```bash
 # 开发构建（不嵌入 frp，读取 bin/ 或 PATH）
-go build -o frp-console .
+go build -o dstlauncher .
 
 # 发布构建：linux/amd64 + windows/amd64
 ./build.sh
-# 产物：dist/frp-console_<os>_<arch>/frp-console(.exe)
+# 产物：dist/dstlauncher_<os>_<arch>/dstlauncher(.exe)
 ```
 
 `build.sh` 会按 `FRP_VERSION`（默认 0.71.1）下载对应平台的 frp 发布包，gzip 后
@@ -75,7 +75,7 @@ go build -o frp-console .
 
 - push `main`：`go vet` + `go test` → 构建 linux/windows → 上传 artifacts；
 - push `v*` tag：额外创建/更新 GitHub Release，附
-  `frp-console-<ver>-windows-amd64.exe`、`frp-console-<ver>-linux-amd64`。
+  `dstlauncher-<ver>-windows-amd64.exe`、`dstlauncher-<ver>-linux-amd64`。
 - release 任务需要 `contents: write`（工作流已声明），使用内置 `GITHUB_TOKEN`。
 
 裁剪版本：
@@ -90,11 +90,11 @@ git push origin v0.5.0
 ## 运行
 
 ```bash
-./frp-console                  # 数据目录 = exe 所在目录；日志同时写 logs/panel.log
-./frp-console -listen 127.0.0.1:7600 -no-open
+./dstlauncher                  # 数据目录 = exe 所在目录；日志同时写 logs/panel.log
+./dstlauncher -listen 127.0.0.1:7600 -no-open
 ```
 
-Windows：双击 `frp-console.exe`，**不弹控制台**，直接在托盘出现图标并打开浏览器：
+Windows：双击 `dstlauncher.exe`，**不弹控制台**，直接在托盘出现图标并打开浏览器：
 
 - 托盘右键：打开面板 / 打开数据目录 / 退出。
 - 再次双击 exe：只打开已在运行的面板，不会起第二个进程。

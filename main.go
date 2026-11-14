@@ -44,7 +44,7 @@ func main() {
 	flag.Parse()
 
 	if *showVer {
-		fmt.Println("frp-console", version)
+		fmt.Println("dstlauncher", version)
 		return
 	}
 
@@ -123,7 +123,7 @@ func main() {
 		}
 	}()
 
-	log.Printf("frp-console %s", version)
+	log.Printf("dstlauncher %s", version)
 	log.Printf("data dir: %s", paths.Root)
 	log.Printf("panel:    %s", url)
 	if paths.Settings.AutoOpen && !*noOpen {

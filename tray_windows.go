@@ -22,7 +22,7 @@ func trayRun(url, dataDir string, quit func()) {
 
 	systray.Run(func() {
 		systray.SetIcon(trayIcon)
-		systray.SetTooltip("frp-console  " + url)
+		systray.SetTooltip("dstlauncher  " + url)
 
 		openItem := systray.AddMenuItem("打开面板", url)
 		dirItem := systray.AddMenuItem("打开数据目录", dataDir)

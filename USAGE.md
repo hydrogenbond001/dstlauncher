@@ -9,7 +9,7 @@
 界面：左侧导航切换 **frp 实例 / DST 服务器**，中间是实例列表，右侧显示配置、
 日志与状态；DST 页顶部横栏配置 steamcmd 目录并更新服务端。
 
-1. 把 `frp-console.exe` 放到任意目录（建议空目录，如 `D:\frp-console\`）。
+1. 把 `dstlauncher.exe` 放到任意目录（建议空目录，如 `D:\dstlauncher\`）。
 2. 双击。**不会出现控制台窗口**，托盘出现图标，浏览器自动打开
    `http://127.0.0.1:7600/`。
 3. 托盘右键菜单：打开面板 / 打开数据目录 / 退出。
@@ -20,8 +20,8 @@
 ### Linux
 
 ```bash
-./frp-console            # 控制台运行，日志同时写 logs/panel.log
-./frp-console -no-open   # 不自动开浏览器
+./dstlauncher            # 控制台运行，日志同时写 logs/panel.log
+./dstlauncher -no-open   # 不自动开浏览器
 ```
 
 Ctrl+C 会停止所有实例并退出。
@@ -206,7 +206,7 @@ http://127.0.0.1:<面板端口>/static/
 
 ```bash
 # 开发构建（不嵌入 frp，读 bin/ 或 PATH）
-go build -o frp-console .
+go build -o dstlauncher .
 
 # 发布构建：linux/amd64 + windows/amd64
 ./build.sh
@@ -218,7 +218,7 @@ WINDOWS_CONSOLE=1 ./build.sh
 VERSION=0.2.1 ./build.sh
 ```
 
-- 产物：`dist/frp-console_<os>_<arch>/frp-console(.exe)`。
+- 产物：`dist/dstlauncher_<os>_<arch>/dstlauncher(.exe)`。
 - frp 发布包缓存在 `dist/.cache/frp_<ver>_<os>_<arch>/`，存在则不联网。
 - 直连 GitHub 失败会自动尝试 `FRP_MIRROR`（默认 `https://ghfast.top/`）。
 - 首次构建需要 Go 模块网络（托盘依赖）；离线时提前 `GOOS=windows go mod download`。
@@ -228,7 +228,7 @@ VERSION=0.2.1 ./build.sh
 
 | 现象 | 原因 / 处理 |
 |---|---|
-| Windows 启停实例弹黑框 | 0.2.0 及更早的 bug；升级 0.2.1。若仍出现，先结束残留的旧 `frp-console.exe`/`frpc.exe` |
+| Windows 启停实例弹黑框 | 0.2.0 及更早的 bug；升级 0.2.1。若仍出现，先结束残留的旧 `dstlauncher.exe`/`frpc.exe` |
 | 双击后什么都没发生 | 看 `logs/panel.log`；若面板已在运行，第二次只打开已有面板，属正常 |
 | DST 启动报“集群目录不存在/没有 cluster.ini” | 选到 `Cluster_2` 这一层，不要选 `DoNotStarveTogether` 或 `bin64` |
 | 启动报“未设置 steamcmd 目录” | 在 DST 顶部横栏填目录并保存 |

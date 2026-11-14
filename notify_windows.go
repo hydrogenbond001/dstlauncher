@@ -13,7 +13,7 @@ var procMessageBox = syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW")
 // panel exists; without it a bad port or data directory fails silently.
 func notifyFatal(msg string) {
 	text, err1 := syscall.UTF16PtrFromString(msg)
-	caption, err2 := syscall.UTF16PtrFromString("frp-console")
+	caption, err2 := syscall.UTF16PtrFromString("dstlauncher")
 	if err1 != nil || err2 != nil {
 		return
 	}
