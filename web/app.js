@@ -13,6 +13,8 @@ let dstConfigData = null;
 let stopped = false;
 let steamBusy = false;
 let steamLogDismissed = false;
+let logViews = {};
+let logSourcesSig = "";
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -179,6 +181,11 @@ async function openDetail(kind, id) {
   const item = listFor(kind === 'frp' ? 'frp' : 'dst').find(x => x.id === id);
   if (!item) return;
   current = { kind, id };
+  logViews = {};
+  logSourcesSig = '';
+  logSource = 'launcher';
+  logOffset = 0;
+  $('#logText').textContent = '';
   $('#placeholder').hidden = true;
   $('#detail').hidden = false;
   $('#detailTitle').textContent = item.name || id;
@@ -200,7 +207,7 @@ async function openDetail(kind, id) {
   } else {
     $('#frpConfig').hidden = true;
     $('#dstConfig').hidden = false;
-    logSource = 'launcher';
+    logSource = ((item.shards || []).find(s => s.isMaster) || {}).name || 'launcher';
     renderLogSources(item);
     try {
       await loadDstConfig(id);
@@ -240,7 +247,12 @@ function switchTab(name) {
   ['config', 'logs', 'status'].forEach(id => {
     $('#tab-' + id).hidden = id !== name;
   });
-  if (name === 'logs') startLogs(); else stopLogs();
+  if (name === 'logs') {
+    startLogs();
+  } else {
+    saveLogView();
+    stopLogs();
+  }
   if (name === 'status') loadStatus();
 }
 
@@ -257,24 +269,38 @@ function renderLogSources(item) {
   const wrap = $('#logSources');
   if (current.kind !== 'dst') {
     wrap.innerHTML = '';
+    logSourcesSig = '';
     return;
   }
   const sources = [{ id: 'launcher', label: '启动日志' }]
     .concat((item.shards || []).map(s => ({ id: s.name, label: s.name })));
-  wrap.innerHTML = sources.map(s =>
-    `<button class="src ${logSource === s.id ? 'active' : ''}" data-src="${esc(s.id)}">${esc(s.label)}</button>`
-  ).join('');
-  $$('.src', wrap).forEach(b => b.addEventListener('click', () => {
-    logSource = b.dataset.src;
-    renderLogSources(item);
-    if (!$('#tab-logs').hidden) startLogs();
-  }));
+  if (!sources.some(s => s.id === logSource)) logSource = 'launcher';
+  const sig = sources.map(s => s.id).join('|');
+  if (sig !== logSourcesSig) {
+    logSourcesSig = sig;
+    wrap.innerHTML = sources.map(s =>
+      `<button class="src" data-src="${esc(s.id)}">${esc(s.label)}</button>`
+    ).join('');
+    $$('.src', wrap).forEach(b => b.addEventListener('click', () => {
+      saveLogView();
+      logSource = b.dataset.src;
+      renderLogSources(item);
+      if (!$('#tab-logs').hidden) startLogs();
+    }));
+  }
+  $$('.src', wrap).forEach(b => b.classList.toggle('active', b.dataset.src === logSource));
+}
+
+function saveLogView() {
+  if (current.kind !== 'dst') return;
+  logViews[logSource] = { offset: logOffset, text: $('#logText').textContent };
 }
 
 function startLogs() {
   stopLogs();
-  logOffset = 0;
-  $('#logText').textContent = '';
+  const view = logViews[logSource] || { offset: 0, text: '' };
+  logOffset = view.offset;
+  $('#logText').textContent = view.text;
   loadLogs();
   logTimer = setInterval(loadLogs, 1500);
 }
@@ -302,6 +328,9 @@ async function loadLogs() {
       if (nearBottom) pre.scrollTop = pre.scrollHeight;
     }
     logOffset = data.next;
+    if (current.kind === 'dst') {
+      logViews[logSource] = { offset: logOffset, text: pre.textContent };
+    }
   } catch {
     // log file may not exist yet
   }
@@ -655,9 +684,15 @@ $('#saveSteamcmd').addEventListener('click', async () => {
   }
 });
 
-$('#steamStatus').addEventListener('click', () => {
+$('#steamStatus').addEventListener('click', async () => {
   const status = $('#steamStatus');
   if (!status.classList.contains('clickable')) return;
+  try {
+    await api('/api/steamcmd/clear', { method: 'POST' });
+  } catch (err) {
+    banner(err.message);
+    return;
+  }
   steamLogDismissed = true;
   $('#steamLog').hidden = true;
   status.classList.remove('clickable');

@@ -76,6 +76,21 @@ func (j *steamJob) finish(err error) {
 	j.errMsg = "命令结束，但没有看到 Success!，请查看日志"
 }
 
+func (j *steamJob) reset() error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.running {
+		return errors.New("steamcmd 正在更新")
+	}
+	j.success = false
+	j.errMsg = ""
+	j.started = time.Time{}
+	j.finished = time.Time{}
+	j.lines = nil
+	j.pending = ""
+	return nil
+}
+
 func (j *steamJob) snapshot() map[string]any {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -179,6 +194,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/steamcmd/status", s.handleSteamStatus)
 	mux.HandleFunc("POST /api/steamcmd/update", s.handleSteamUpdate)
 	mux.HandleFunc("POST /api/steamcmd/test", s.handleSteamCmdTest)
+	mux.HandleFunc("POST /api/steamcmd/clear", s.handleSteamClear)
 	return mux
 }
 
@@ -1214,4 +1230,12 @@ func (s *Server) handleSteamCmdTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "output": text})
+}
+
+func (s *Server) handleSteamClear(w http.ResponseWriter, r *http.Request) {
+	if err := s.steam.reset(); err != nil {
+		fail(w, http.StatusConflict, "%v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
