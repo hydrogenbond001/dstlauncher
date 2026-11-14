@@ -564,8 +564,13 @@ func (s *Server) writeLog(w http.ResponseWriter, path string, offset int) {
 		base = len(lines) - maxLines
 		lines = lines[base:]
 	}
-	if offset < base {
+	total := base + len(lines)
+	reset := false
+	// The game rotates server_log.txt on every start; an offset from the old
+	// file must not silently skip the beginning of the new one.
+	if offset > total || offset < base {
 		offset = base
+		reset = true
 	}
 	start := offset - base
 	if start > len(lines) {
@@ -573,8 +578,8 @@ func (s *Server) writeLog(w http.ResponseWriter, path string, offset int) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"lines": lines[start:],
-		"next":  base + len(lines),
-		"reset": offset < base,
+		"next":  total,
+		"reset": reset,
 	})
 }
 

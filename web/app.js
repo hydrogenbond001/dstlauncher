@@ -15,6 +15,7 @@ let steamBusy = false;
 let steamLogDismissed = false;
 let logViews = {};
 let logSourcesSig = "";
+let logForceBottom = false;
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -146,6 +147,15 @@ $('#list').addEventListener('click', async (e) => {
       if (current.kind === kind && current.id === id) closeDetail();
     } else {
       await api(`${base}/${act}`, { method: 'POST' });
+      if (kind === 'dst' && act !== 'stop' && current.kind === 'dst' && current.id === id) {
+        // A new run writes a fresh server_log.txt; drop cached offsets/text.
+        logViews = {};
+        logSourcesSig = '';
+        logOffset = 0;
+        logForceBottom = true;
+        $('#logText').textContent = '';
+        if (!$('#tab-logs').hidden) startLogs();
+      }
     }
     await refresh();
   } catch (err) {
@@ -284,6 +294,7 @@ function renderLogSources(item) {
     $$('.src', wrap).forEach(b => b.addEventListener('click', () => {
       saveLogView();
       logSource = b.dataset.src;
+      logForceBottom = true;
       renderLogSources(item);
       if (!$('#tab-logs').hidden) startLogs();
     }));
@@ -300,7 +311,10 @@ function startLogs() {
   stopLogs();
   const view = logViews[logSource] || { offset: 0, text: '' };
   logOffset = view.offset;
-  $('#logText').textContent = view.text;
+  const pre = $('#logText');
+  pre.textContent = view.text;
+  pre.scrollTop = pre.scrollHeight;
+  logForceBottom = true;
   loadLogs();
   logTimer = setInterval(loadLogs, 1500);
 }
@@ -321,11 +335,20 @@ async function loadLogs() {
     const data = await api(url);
     const pre = $('#logText');
     const lines = data.lines || [];
-    if (data.reset) pre.textContent = '';
+    if (data.reset) {
+      pre.textContent = '';
+      logForceBottom = true;
+    }
     if (lines.length) {
       const nearBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 40;
       pre.textContent += lines.join('\n') + '\n';
-      if (nearBottom) pre.scrollTop = pre.scrollHeight;
+      if (logForceBottom || nearBottom) {
+        pre.scrollTop = pre.scrollHeight;
+        logForceBottom = false;
+      }
+    } else if (logForceBottom) {
+      pre.scrollTop = pre.scrollHeight;
+      logForceBottom = false;
     }
     logOffset = data.next;
     if (current.kind === 'dst') {
