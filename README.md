@@ -76,7 +76,8 @@ go build -o dstlauncher .
 
 - push `main`：`go vet` + `go test` → 构建 linux/windows → 上传 artifacts；
 - push `v*` tag：额外创建/更新 GitHub Release，附
-  `dstlauncher-<ver>-windows-amd64.exe`、`dstlauncher-<ver>-linux-amd64`。
+  `dstlauncher-<ver>-windows-amd64.exe`、`dstlauncher-<ver>-linux-amd64`、
+  `dstlauncher-<ver>-linux-armv7l`。
 - release 任务需要 `contents: write`（工作流已声明），使用内置 `GITHUB_TOKEN`。
 
 裁剪版本：
