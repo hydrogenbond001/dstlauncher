@@ -15,12 +15,11 @@ EMBED_DIR="internal/embedfs/bin"
 # prefix. Set FRP_MIRROR="" to disable, or FRP_MIRROR="https://..." to override.
 FRP_MIRROR="${FRP_MIRROR-https://ghfast.top/}"
 
-# Stated scope: Linux (dev host) + Windows (test target).
-# Add macOS once its frp release zip is in dist/.cache (or network allows):
-#   TARGETS+=("darwin arm64")
+# target: <goos> <goarch> <output-label> [GOARM]
 TARGETS=(
-  "linux amd64"
-  "windows amd64"
+  "linux amd64 amd64"
+  "windows amd64 amd64"
+  "linux arm armv7l 7"
 )
 
 need() {
@@ -93,7 +92,7 @@ restore_placeholder() {
 trap restore_placeholder EXIT
 
 for target in "${TARGETS[@]}"; do
-  read -r os arch <<<"$target"
+  read -r os arch label goarm <<<"$target"
   frpdir="$(fetch_frp "$os" "$arch")"
 
   ext=""
@@ -105,7 +104,7 @@ for target in "${TARGETS[@]}"; do
   gzip -9 -c "$frpdir/frpc$ext" > "$EMBED_DIR/frpc$ext.gz"
   gzip -9 -c "$frpdir/frps$ext" > "$EMBED_DIR/frps$ext.gz"
 
-  outdir="$OUT/dstlauncher_${os}_${arch}"
+  outdir="$OUT/dstlauncher_${os}_${label}"
   mkdir -p "$outdir"
   # frp ships under Apache-2.0; keep its license next to the embedded binaries.
   cp "$frpdir/LICENSE" "$outdir/LICENSE-frp.txt"
@@ -116,8 +115,8 @@ for target in "${TARGETS[@]}"; do
     ldflags="$ldflags -H=windowsgui"
   fi
 
-  echo ">> build ${os}/${arch} -> ${outdir}/dstlauncher${ext}"
-  CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
+  echo ">> build ${os}/${arch}${goarm:+ armv$goarm} -> ${outdir}/dstlauncher${ext}"
+  CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" GOARM="${goarm:-}" go build -trimpath \
     -ldflags "$ldflags" \
     -o "$outdir/dstlauncher${ext}" .
 done

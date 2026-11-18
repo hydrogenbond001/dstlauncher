@@ -218,7 +218,7 @@ WINDOWS_CONSOLE=1 ./build.sh
 VERSION=0.2.1 ./build.sh
 ```
 
-- 产物：`dist/dstlauncher_<os>_<arch>/dstlauncher(.exe)`。
+- 产物：`dist/dstlauncher_<os>_<arch>/dstlauncher(.exe)`；ARMv7 为 `dist/dstlauncher_linux_armv7l/`。
 - frp 发布包缓存在 `dist/.cache/frp_<ver>_<os>_<arch>/`，存在则不联网。
 - 直连 GitHub 失败会自动尝试 `FRP_MIRROR`（默认 `https://ghfast.top/`）。
 - 首次构建需要 Go 模块网络（托盘依赖）；离线时提前 `GOOS=windows go mod download`。

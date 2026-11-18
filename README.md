@@ -54,9 +54,10 @@ logs/panel.log             # 面板自身日志（Windows GUI 构建唯一启动
 # 开发构建（不嵌入 frp，读取 bin/ 或 PATH）
 go build -o dstlauncher .
 
-# 发布构建：linux/amd64 + windows/amd64
+# 发布构建：linux/amd64 + windows/amd64 + linux/armv7l
 ./build.sh
 # 产物：dist/dstlauncher_<os>_<arch>/dstlauncher(.exe)
+#      armv7l 目录为 dist/dstlauncher_linux_armv7l/
 ```
 
 `build.sh` 会按 `FRP_VERSION`（默认 0.71.1）下载对应平台的 frp 发布包，gzip 后
