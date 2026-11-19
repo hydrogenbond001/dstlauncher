@@ -25,7 +25,8 @@
   常用项，不改文件结构与其它键；启动时用 steamcmd 目录自动定位 Dedicated Server，
   设置 `SteamAppId`/工作目录后直接拉起分片（无控制台窗口），停止时发送
   `c_shutdown()`；日志可看启动输出或各分片 `server_log.txt`。
-- **steamcmd**：DST 页顶部设置目录；可一键 `app_update 343050 validate`，
+- **steamcmd**：DST 页顶部设置目录；可一键下载 SteamCMD（目录里已有
+  `steamcmd.exe`/`steamcmd.sh` 时跳过），再执行 `app_update 343050 validate`，
   异步等待并显示 `Success!` 与实时日志。
 - **单实例**：重复双击不会起第二个进程，只会打开已在运行的面板。
 - **可退出**：托盘菜单“退出”、面板右上角“退出”、`POST /api/quit` 都走同一条

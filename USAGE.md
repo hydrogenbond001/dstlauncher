@@ -120,7 +120,8 @@ logs/panel.log             面板自身日志
 
 DST 顶部横栏：
 
-1. 填 steamcmd 目录（含 `steamcmd.exe` / `steamcmd.sh`），点“保存”；
+1. 填 steamcmd 目录，点“保存”；目录为空时可直接点“下载 steamcmd”，
+   已有 `steamcmd.exe` / `steamcmd.sh` 则不会重复下载；
 2. 点“更新服务端”执行
    `+login anonymous +app_update 343050 validate +quit`；
 3. 状态栏显示“更新中… Ns”，下方小日志实时滚动；出现 `Success!` 即成功。

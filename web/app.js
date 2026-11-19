@@ -13,6 +13,7 @@ let dstConfigData = null;
 let stopped = false;
 let steamBusy = false;
 let steamLogDismissed = false;
+let steamDownloading = false;
 let logViews = {};
 let logSourcesSig = "";
 let logForceBottom = false;
@@ -641,7 +642,7 @@ async function loadSettings() {
 }
 
 async function loadSteamStatus() {
-  if (view !== 'dst' || stopped) return;
+  if (view !== 'dst' || stopped || steamDownloading) return;
   try {
     const st = await api('/api/steamcmd/status');
     const status = $('#steamStatus');
@@ -721,6 +722,35 @@ $('#steamStatus').addEventListener('click', async () => {
   status.classList.remove('clickable');
   status.title = '';
   status.textContent = 'Success! 更新完成';
+});
+
+$('#downloadSteamcmd').addEventListener('click', async () => {
+  const dir = $('#steamcmdDir').value.trim();
+  if (!dir) {
+    banner('请先填写 steamcmd 目录');
+    return;
+  }
+  const btn = $('#downloadSteamcmd');
+  const status = $('#steamStatus');
+  btn.disabled = true;
+  steamDownloading = true;
+  status.className = 'hint warn';
+  status.textContent = '下载 steamcmd…';
+  try {
+    const res = await api('/api/steamcmd/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dir }),
+    });
+    banner(res.already ? 'steamcmd 已存在，未重复下载' : 'steamcmd 下载完成', true);
+    await loadSettings();
+  } catch (err) {
+    banner('下载失败：' + err.message);
+  } finally {
+    steamDownloading = false;
+    btn.disabled = false;
+    await loadSteamStatus();
+  }
 });
 
 $('#updateSteamcmd').addEventListener('click', async () => {

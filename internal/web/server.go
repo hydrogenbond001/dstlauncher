@@ -21,6 +21,7 @@ import (
 	"frpconsole/internal/app"
 	dstpkg "frpconsole/internal/dst"
 	"frpconsole/internal/frpx"
+	"frpconsole/internal/steamcmd"
 	"frpconsole/internal/store"
 	"frpconsole/internal/unit"
 )
@@ -195,6 +196,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/steamcmd/update", s.handleSteamUpdate)
 	mux.HandleFunc("POST /api/steamcmd/test", s.handleSteamCmdTest)
 	mux.HandleFunc("POST /api/steamcmd/clear", s.handleSteamClear)
+	mux.HandleFunc("POST /api/steamcmd/install", s.handleSteamInstall)
 	return mux
 }
 
@@ -1243,4 +1245,37 @@ func (s *Server) handleSteamClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (s *Server) handleSteamInstall(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Dir string `json:"dir"`
+	}
+	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		fail(w, http.StatusBadRequest, "invalid body: %v", err)
+		return
+	}
+	dir := strings.TrimSpace(req.Dir)
+	if dir == "" {
+		fail(w, http.StatusBadRequest, "steamcmd 目录不能为空")
+		return
+	}
+	path, already, err := steamcmd.Install(dir)
+	if err != nil {
+		fail(w, http.StatusBadRequest, "下载 SteamCMD 失败: %v", err)
+		return
+	}
+	s.paths.Settings.SteamCmdDir = dir
+	if err := s.paths.SaveSettings(); err != nil {
+		fail(w, http.StatusInternalServerError, "save settings: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":          true,
+		"already":     already,
+		"path":        path,
+		"steamcmdDir": dir,
+	})
 }
