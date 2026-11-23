@@ -97,7 +97,7 @@ func (s *Server) handleSetupAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		if info, err := s.steamModDetails(id); err == nil {
+		if info, err := steamModDetails(id); err == nil {
 			name = info.Title
 		}
 	}

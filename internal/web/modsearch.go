@@ -31,6 +31,9 @@ var (
 	htmlTagRe        = regexp.MustCompile(`<[^>]+>`)
 )
 
+var searchClient = &http.Client{Timeout: 15 * time.Second}
+var detailClient = &http.Client{Timeout: 6 * time.Second}
+
 type publishedFile struct {
 	ID            string `json:"publishedfileid"`
 	Result        int    `json:"result"`
@@ -58,16 +61,16 @@ func (s *Server) handleModSearch(w http.ResponseWriter, r *http.Request) {
 	)
 	if id, ok := numericModID(q); ok {
 		var one modSearchResult
-		one, err = s.steamModDetails(id)
+		one, err = steamModDetails(id)
 		if err == nil {
 			results = []modSearchResult{one}
 			source = "steam-web-api"
 		}
 	} else if key != "" {
-		results, err = s.steamQueryFiles(key, q)
+		results, err = steamQueryFiles(key, q)
 		source = "steam-web-api"
 	} else {
-		results, err = s.scrapeWorkshop(q)
+		results, err = scrapeWorkshop(q)
 		source = "steamcommunity"
 	}
 	if err != nil {
@@ -96,11 +99,11 @@ func numericModID(q string) (string, bool) {
 	return q, true
 }
 
-func (s *Server) steamModDetails(id string) (modSearchResult, error) {
+func steamModDetails(id string) (modSearchResult, error) {
 	form := url.Values{}
 	form.Set("itemcount", "1")
 	form.Set("publishedfileids[0]", id)
-	resp, err := s.externalClient(6*time.Second).PostForm("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/", form)
+	resp, err := detailClient.PostForm("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/", form)
 	if err != nil {
 		return modSearchResult{}, fmt.Errorf("访问 Steam API 失败: %w", err)
 	}
@@ -122,7 +125,7 @@ func (s *Server) steamModDetails(id string) (modSearchResult, error) {
 	return publishedToResult(f), nil
 }
 
-func (s *Server) steamQueryFiles(key, q string) ([]modSearchResult, error) {
+func steamQueryFiles(key, q string) ([]modSearchResult, error) {
 	u, _ := url.Parse("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/")
 	v := u.Query()
 	v.Set("key", key)
@@ -141,7 +144,7 @@ func (s *Server) steamQueryFiles(key, q string) ([]modSearchResult, error) {
 		v.Set("query_type", "1")
 	}
 	u.RawQuery = v.Encode()
-	resp, err := s.externalClient(15 * time.Second).Get(u.String())
+	resp, err := searchClient.Get(u.String())
 	if err != nil {
 		return nil, fmt.Errorf("访问 Steam API 失败: %w", err)
 	}
@@ -185,7 +188,7 @@ func publishedToResult(f publishedFile) modSearchResult {
 	}
 }
 
-func (s *Server) scrapeWorkshop(q string) ([]modSearchResult, error) {
+func scrapeWorkshop(q string) ([]modSearchResult, error) {
 	endpoint := "https://steamcommunity.com/workshop/browse/?appid=322330&section=readytouseitems&browsesort=textsearch&searchtext=" + url.QueryEscape(q)
 	if q == "" {
 		endpoint = "https://steamcommunity.com/workshop/browse/?appid=322330&section=readytouseitems&browsesort=trend"
@@ -196,7 +199,7 @@ func (s *Server) scrapeWorkshop(q string) ([]modSearchResult, error) {
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) dstlauncher")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	resp, err := s.externalClient(15 * time.Second).Do(req)
+	resp, err := searchClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("访问 Steam 社区失败: %w", err)
 	}
