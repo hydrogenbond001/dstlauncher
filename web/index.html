@@ -88,6 +88,14 @@
             </div>
           </div>
 
+          <div class="tab-body" id="tab-mods" hidden>
+            <div class="actions">
+              <span class="hint">写入 modoverrides.lua 与安装目录的 dedicated_server_mods_setup.lua，重启服务器后生效</span>
+              <button id="addMod" class="primary">+ 添加 Mod</button>
+            </div>
+            <div id="modsList"></div>
+          </div>
+
           <div class="tab-body" id="tab-logs" hidden>
             <div class="actions">
               <span class="hint">每 1.5s 增量刷新</span>
@@ -150,17 +158,75 @@
     </div>
 
     <div id="dstFields" hidden>
-      <div class="row">
-        <label>名称 <input name="dstName" required placeholder="饥荒主服"></label>
-        <label>集群目录 <input name="clusterDir" required placeholder="...\DoNotStarveTogether\Cluster_2"></label>
+      <div class="mode-switch">
+        <button type="button" class="mode active" data-dst-mode="existing">添加已有集群</button>
+        <button type="button" class="mode" data-dst-mode="new">创建新集群</button>
       </div>
-      <p class="hint">目录内的 Master / Caves 会自动识别。启动时通过上方 steamcmd 目录定位服务端，
-        自动设置 SteamAppId 并在游戏根目录执行开服命令；命令按集群目录生成并保存在实例文件里。</p>
+
+      <div id="dstExisting">
+        <div class="row">
+          <label>名称 <input name="dstName" required placeholder="饥荒主服"></label>
+          <label>集群目录 <input name="clusterDir" required placeholder="...\DoNotStarveTogether\Cluster_2"></label>
+        </div>
+        <p class="hint">目录内的 Master / Caves 会自动识别；启动时用上方 steamcmd 目录定位服务端。</p>
+      </div>
+
+      <div id="dstNew" hidden>
+        <div class="row">
+          <label>名称 <input name="newName" required placeholder="新的饥荒服"></label>
+          <label>集群根目录 <input name="root" required placeholder="...\DoNotStarveTogether"></label>
+          <label>集群文件夹名 <input name="clusterName" value="Cluster_2" required></label>
+        </div>
+        <div class="row">
+          <label>token <input name="newToken" placeholder="cluster_token.txt 内容，可留空"></label>
+          <label>游戏模式
+            <select name="gameMode">
+              <option value="survival">survival</option>
+              <option value="endless">endless</option>
+              <option value="wilderness">wilderness</option>
+            </select>
+          </label>
+          <label>最大玩家 <input type="number" name="maxPlayers" value="6" min="1" max="64"></label>
+          <label>房间密码 <input name="password"></label>
+          <label class="check-label"><span>PVP</span><input type="checkbox" name="pvp"></label>
+          <label class="check-label"><span>启用洞穴</span><input type="checkbox" name="enableCaves" checked></label>
+        </div>
+        <div class="row">
+          <label>Master 端口 <input type="number" name="masterPort" value="10999" min="1" max="65535"></label>
+          <label>Caves 端口 <input type="number" name="cavesPort" value="10998" min="1" max="65535"></label>
+          <label>master_port <input type="number" name="shardPort" value="10888" min="1" max="65535"></label>
+        </div>
+        <p class="hint">会在根目录下创建 &lt;集群文件夹名&gt;/{cluster.ini, Master, Caves}；
+          token 留空可稍后补。</p>
+      </div>
     </div>
 
     <div class="actions dialog-actions">
       <button type="submit" class="primary">创建</button>
       <span id="createHint" class="hint"></span>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="modDialog">
+  <form id="modForm">
+    <div class="dialog-head">
+      <h2>添加 Mod</h2>
+      <button type="button" id="closeMod" class="ghost" aria-label="关闭">×</button>
+    </div>
+    <div class="row">
+      <label>Workshop ID 或链接 <input name="modId" required placeholder="378160973 或 ...?id=378160973"></label>
+      <label>名称（可选） <input name="modName"></label>
+    </div>
+    <div class="row">
+      <label class="check-label"><span>启用</span><input type="checkbox" name="modEnabled" checked></label>
+      <label class="check-label"><span>Master</span><input type="checkbox" name="modMaster" checked></label>
+      <label class="check-label"><span>Caves</span><input type="checkbox" name="modCaves" checked></label>
+      <label class="check-label"><span>写入下载列表</span><input type="checkbox" name="modSetup" checked></label>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">添加</button>
+      <span id="modHint" class="hint"></span>
     </div>
   </form>
 </dialog>

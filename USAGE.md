@@ -91,10 +91,23 @@ logs/panel.log             面板自身日志
 左侧切到 **DST 服务器**。顶部横栏先填 **steamcmd 目录**（保存一次即可），
 右侧是“新建 DST 服务器”。
 
-| 字段 | 说明 |
-|---|---|
-| 名称 | 显示名 |
-| 集群目录 | 指向 `...\DoNotStarveTogether\Cluster_2`（必须含 `cluster.ini`，内有 Master/Caves） |
+创建 DST 服务器有两种模式：
+
+- **添加已有集群**：填名称 + 集群目录（必须含 `cluster.ini`，内有 Master/Caves）；
+- **创建新集群**：填根目录和集群文件夹名，可选游戏模式、最大玩家、PVP、
+  密码、token、端口、是否启用洞穴；面板生成
+  `cluster.ini` / `Master/server.ini` / `Caves/server.ini` / worldgenoverride。
+
+### Mods
+
+详情 → **Mods**：
+
+- 添加：Workshop ID 或链接、名称备注、启用、作用分片、是否写下载列表；
+- 列表显示每个分片的启停、是否在下载列表、是否已下载；
+- 写入 `<分片>/modoverrides.lua` 和安装目录
+  `mods/dedicated_server_mods_setup.lua`，保留已有 `configuration_options`，
+  修改前生成 `.bak-时间` 备份；
+- 修改后需重启服务器才生效。
 
 世界自动识别：一级子目录里带 `server.ini` 即为一个分片。启动不再需要配置 bat。
 

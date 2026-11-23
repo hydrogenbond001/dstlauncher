@@ -186,7 +186,10 @@ function switchView(next) {
 
 $$('.nav-item').forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
 
-const TABS = [['config', '配置'], ['logs', '日志'], ['status', '状态']];
+const TABS_FRP = [['config', '配置'], ['logs', '日志'], ['status', '状态']];
+const TABS_DST = [['config', '配置'], ['mods', 'Mods'], ['logs', '日志'], ['status', '状态']];
+let modsData = null;
+let dstMode = 'existing';
 
 async function openDetail(kind, id) {
   const item = listFor(kind === 'frp' ? 'frp' : 'dst').find(x => x.id === id);
@@ -200,8 +203,10 @@ async function openDetail(kind, id) {
   $('#placeholder').hidden = true;
   $('#detail').hidden = false;
   $('#detailTitle').textContent = item.name || id;
+  modsData = null;
+  $('#modsList').innerHTML = '';
   syncDetail();
-  buildTabs();
+  buildTabs(kind);
 
   if (kind === 'frp') {
     $('#frpConfig').hidden = false;
@@ -246,8 +251,9 @@ function syncDetail() {
   if (current.kind === 'dst') renderLogSources(item);
 }
 
-function buildTabs() {
-  $('#tabs').innerHTML = TABS
+function buildTabs(kind) {
+  const tabs = kind === 'dst' ? TABS_DST : TABS_FRP;
+  $('#tabs').innerHTML = tabs
     .map(([id, label], i) => `<button class="tab ${i === 0 ? 'active' : ''}" data-tab="${id}">${label}</button>`)
     .join('');
   $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
@@ -255,8 +261,9 @@ function buildTabs() {
 
 function switchTab(name) {
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  ['config', 'logs', 'status'].forEach(id => {
-    $('#tab-' + id).hidden = id !== name;
+  ['config', 'mods', 'logs', 'status'].forEach(id => {
+    const el = $('#tab-' + id);
+    if (el) el.hidden = id !== name;
   });
   if (name === 'logs') {
     startLogs();
@@ -264,6 +271,7 @@ function switchTab(name) {
     saveLogView();
     stopLogs();
   }
+  if (name === 'mods') loadMods();
   if (name === 'status') loadStatus();
 }
 
@@ -502,6 +510,134 @@ $('#dashLink').addEventListener('click', () => {
 
 $('#closeDetail').addEventListener('click', closeDetail);
 
+/* ---- dst mods ---- */
+
+async function loadMods() {
+  if (current.kind !== 'dst') return;
+  try {
+    modsData = await api(`/api/dst/${current.id}/mods`);
+    renderMods(modsData);
+  } catch (err) {
+    $('#modsList').innerHTML = `<p class="small warn">${esc(err.message)}</p>`;
+  }
+}
+
+function renderMods(data) {
+  const wrap = $('#modsList');
+  const shards = data.shards || [];
+  const hasMaster = shards.includes('Master');
+  const hasCaves = shards.includes('Caves');
+  const warning = data.setupError
+    ? `<p class="small warn">下载列表不可用：${esc(data.setupError)}</p>`
+    : '';
+  if (!(data.mods || []).length) {
+    wrap.innerHTML = warning + '<p class="empty">还没有 Mod。点“添加 Mod”写入 modoverrides.lua。</p>';
+    return;
+  }
+  wrap.innerHTML = warning + (data.mods || []).map(m => {
+    const name = m.name || '未命名 Mod';
+    return `<div class="mod-row">
+      <div class="mod-info">
+        <strong title="${esc(name)}">${esc(name)}</strong>
+        <span class="mono small muted">workshop-${esc(m.id)}</span>
+        <span class="chip">${m.inSetup ? '下载列表 ✓' : '下载列表 ✗'}</span>
+        <span class="chip">${m.downloaded ? '已下载' : '未下载'}</span>
+      </div>
+      <div class="actions">
+        <button class="src ${m.masterEnabled ? 'active' : ''}" data-mod-toggle="Master" data-id="${esc(m.id)}" ${hasMaster ? '' : 'disabled'}>Master ${m.masterEnabled ? '开' : '关'}</button>
+        <button class="src ${m.cavesEnabled ? 'active' : ''}" data-mod-toggle="Caves" data-id="${esc(m.id)}" ${hasCaves ? '' : 'disabled'}>Caves ${m.cavesEnabled ? '开' : '关'}</button>
+        <button class="ghost danger" data-mod-del="${esc(m.id)}">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+$('#modsList').addEventListener('click', async (e) => {
+  if (current.kind !== 'dst' || !modsData) return;
+  const del = e.target.closest('[data-mod-del]');
+  if (del) {
+    if (!confirm(`删除 Mod ${del.dataset.modDel} 并移出下载列表？`)) return;
+    try {
+      await api(`/api/dst/${current.id}/mods/${del.dataset.modDel}`, { method: 'DELETE' });
+      await loadMods();
+      banner('已删除，重启服务器后生效', true);
+    } catch (err) {
+      banner(err.message);
+    }
+    return;
+  }
+  const tog = e.target.closest('[data-mod-toggle]');
+  if (!tog) return;
+  const id = tog.dataset.id;
+  const shard = tog.dataset.modToggle;
+  const mod = (modsData.mods || []).find(m => m.id === id);
+  if (!mod) return;
+  const enabled = shard === 'Master' ? mod.masterEnabled : mod.cavesEnabled;
+  try {
+    await api(`/api/dst/${current.id}/mods/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !enabled, shards: [shard] }),
+    });
+    await loadMods();
+    banner('已写入，重启服务器后生效', true);
+  } catch (err) {
+    banner(err.message);
+  }
+});
+
+$('#addMod').addEventListener('click', () => {
+  if (!modsData) {
+    banner('Mod 列表还没加载完成');
+    return;
+  }
+  const el = $('#modForm').elements;
+  el.modId.value = '';
+  el.modName.value = '';
+  el.modEnabled.checked = true;
+  el.modSetup.checked = true;
+  el.modMaster.checked = modsData.shards.includes('Master');
+  const hasCaves = modsData.shards.includes('Caves');
+  el.modCaves.checked = hasCaves;
+  el.modCaves.disabled = !hasCaves;
+  $('#modHint').textContent = '';
+  $('#modDialog').showModal();
+});
+
+$('#closeMod').addEventListener('click', () => $('#modDialog').close());
+
+$('#modForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (current.kind !== 'dst') return;
+  const el = e.target.elements;
+  const shards = [];
+  if (el.modMaster.checked) shards.push('Master');
+  if (el.modCaves.checked && !el.modCaves.disabled) shards.push('Caves');
+  if (!shards.length) {
+    $('#modHint').textContent = '至少选择一个分片';
+    return;
+  }
+  $('#modHint').textContent = '写入中…';
+  try {
+    await api(`/api/dst/${current.id}/mods`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workshopID: el.modId.value.trim(),
+        name: el.modName.value.trim(),
+        enabled: el.modEnabled.checked,
+        shards,
+        addSetup: el.modSetup.checked,
+      }),
+    });
+    $('#modDialog').close();
+    await loadMods();
+    banner('Mod 已添加，重启服务器后生效', true);
+  } catch (err) {
+    $('#modHint').textContent = err.message;
+  }
+});
+
 /* ---- create dialog ---- */
 
 function markRequired(root) {
@@ -512,12 +648,26 @@ function setRequired(root, on) {
   $$('[data-required="1"]', root).forEach(el => { el.required = on; });
 }
 
+function setDstMode(mode) {
+  dstMode = mode;
+  $$('.mode[data-dst-mode]').forEach(b => b.classList.toggle('active', b.dataset.dstMode === mode));
+  $('#dstExisting').hidden = mode !== 'existing';
+  $('#dstNew').hidden = mode !== 'new';
+  setRequired($('#dstExisting'), mode === 'existing');
+  setRequired($('#dstNew'), mode === 'new');
+}
+
 function openCreate() {
   $('#createTitle').textContent = view === 'frp' ? '新建 frp 实例' : '新建 DST 服务器';
   $('#frpFields').hidden = view !== 'frp';
   $('#dstFields').hidden = view !== 'dst';
   setRequired($('#frpFields'), view === 'frp');
-  setRequired($('#dstFields'), view === 'dst');
+  if (view === 'dst') {
+    setDstMode(dstMode);
+  } else {
+    setRequired($('#dstExisting'), false);
+    setRequired($('#dstNew'), false);
+  }
   $('#createHint').textContent = '';
   $('#createDialog').showModal();
 }
@@ -601,13 +751,34 @@ $('#createForm').addEventListener('submit', async (e) => {
         body: JSON.stringify(body),
       });
     } else {
+      let body;
+      if (dstMode === 'existing') {
+        body = {
+          mode: 'existing',
+          name: el.dstName.value.trim(),
+          clusterDir: el.clusterDir.value.trim(),
+        };
+      } else {
+        body = {
+          mode: 'new',
+          name: el.newName.value.trim(),
+          root: el.root.value.trim(),
+          clusterName: el.clusterName.value.trim(),
+          token: el.newToken.value,
+          gameMode: el.gameMode.value,
+          maxPlayers: Number(el.maxPlayers.value),
+          pvp: el.pvp.checked,
+          password: el.password.value,
+          masterPort: Number(el.masterPort.value),
+          cavesPort: Number(el.cavesPort.value),
+          shardPort: Number(el.shardPort.value),
+          enableCaves: el.enableCaves.checked,
+        };
+      }
       created = await api('/api/dst', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: el.dstName.value.trim(),
-          clusterDir: el.clusterDir.value.trim(),
-        }),
+        body: JSON.stringify(body),
       });
     }
     $('#createDialog').close();
@@ -622,6 +793,7 @@ $('#createForm').addEventListener('submit', async (e) => {
 $('#newBtn').addEventListener('click', openCreate);
 $('#closeCreate').addEventListener('click', () => $('#createDialog').close());
 $('#addProxy').addEventListener('click', addProxyRow);
+$$('.mode[data-dst-mode]').forEach(b => b.addEventListener('click', () => setDstMode(b.dataset.dstMode)));
 
 $('#kind').addEventListener('change', () => {
   const client = $('#kind').value === 'client';

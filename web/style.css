@@ -213,6 +213,24 @@ pre {
   word-break: break-word;
 }
 
+.mode-switch { display: flex; gap: 6px; margin-bottom: 14px; }
+.mode { border: 1px solid var(--border); background: transparent; border-radius: 999px; padding: 6px 12px; color: var(--muted); }
+.mode.active { border-color: var(--accent); color: var(--accent); }
+
+.mod-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.mod-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.mod-info strong { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .cfg-section { margin-bottom: 18px; }
 .cfg-section h4 { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .cfg-section + .cfg-section { border-top: 1px solid var(--border); padding-top: 16px; }

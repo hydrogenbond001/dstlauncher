@@ -189,6 +189,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/dst/{id}/logs", s.handleDSTLogs)
 	mux.HandleFunc("GET /api/dst/{id}/status", s.handleDSTStatus)
 	mux.HandleFunc("GET /api/dst/{id}/config", s.handleDSTConfigGet)
+	mux.HandleFunc("GET /api/dst/{id}/mods", s.handleModsGet)
+	mux.HandleFunc("POST /api/dst/{id}/mods", s.handleModsAdd)
+	mux.HandleFunc("PATCH /api/dst/{id}/mods/{mod}", s.handleModsUpdate)
+	mux.HandleFunc("DELETE /api/dst/{id}/mods/{mod}", s.handleModsDelete)
 	mux.HandleFunc("PUT /api/dst/{id}/config", s.handleDSTConfigPut)
 	mux.HandleFunc("GET /api/settings", s.handleSettingsGet)
 	mux.HandleFunc("PUT /api/settings", s.handleSettingsPut)
@@ -770,8 +774,20 @@ func (s *Server) launchCommand(p store.DSTProfile) string {
 }
 
 type dstCreateRequest struct {
-	Name       string `json:"name"`
-	ClusterDir string `json:"clusterDir"`
+	Name        string `json:"name"`
+	Mode        string `json:"mode"`
+	ClusterDir  string `json:"clusterDir"`
+	Root        string `json:"root"`
+	ClusterName string `json:"clusterName"`
+	Token       string `json:"token"`
+	GameMode    string `json:"gameMode"`
+	MaxPlayers  int    `json:"maxPlayers"`
+	PvP         bool   `json:"pvp"`
+	Password    string `json:"password"`
+	MasterPort  int    `json:"masterPort"`
+	CavesPort   int    `json:"cavesPort"`
+	ShardPort   int    `json:"shardPort"`
+	EnableCaves bool   `json:"enableCaves"`
 }
 
 func (s *Server) handleDSTCreate(w http.ResponseWriter, r *http.Request) {
@@ -782,14 +798,43 @@ func (s *Server) handleDSTCreate(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "invalid body: %v", err)
 		return
 	}
-	p := store.DSTProfile{
-		Name:       strings.TrimSpace(req.Name),
-		ClusterDir: strings.TrimSpace(req.ClusterDir),
-	}
-	if p.Name == "" {
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
 		fail(w, http.StatusBadRequest, "名称不能为空")
 		return
 	}
+	mode := strings.TrimSpace(req.Mode)
+	if mode == "" {
+		mode = "existing"
+	}
+	clusterDir := strings.TrimSpace(req.ClusterDir)
+	switch mode {
+	case "existing":
+	case "new":
+		dir, err := createCluster(clusterSpec{
+			DisplayName: name,
+			Root:        req.Root,
+			ClusterName: req.ClusterName,
+			Token:       req.Token,
+			GameMode:    req.GameMode,
+			MaxPlayers:  req.MaxPlayers,
+			PvP:         req.PvP,
+			Password:    req.Password,
+			MasterPort:  req.MasterPort,
+			CavesPort:   req.CavesPort,
+			ShardPort:   req.ShardPort,
+			EnableCaves: req.EnableCaves,
+		})
+		if err != nil {
+			fail(w, http.StatusBadRequest, "%v", err)
+			return
+		}
+		clusterDir = dir
+	default:
+		fail(w, http.StatusBadRequest, "mode 必须是 existing 或 new")
+		return
+	}
+	p := store.DSTProfile{Name: name, ClusterDir: clusterDir}
 	if err := dstpkg.ValidateClusterDir(p.ClusterDir); err != nil {
 		fail(w, http.StatusBadRequest, "%v", err)
 		return

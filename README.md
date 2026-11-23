@@ -21,6 +21,11 @@
 - **Windows 无控制台**：GUI 子系统构建，启动后只有托盘图标，不弹黑框。
 - **实例进程无窗口**：frpc/frps 与 DST 分片均以 `CREATE_NO_WINDOW` 启动，
   输出只写日志文件，启停不会闪黑框。
+- **DST Mods**：详情 Mods 页添加/启用/停用/删除，写入各分片
+  `modoverrides.lua` 与安装目录 `mods/dedicated_server_mods_setup.lua`，
+  保留已有 `configuration_options` 并自动备份。
+- **新建 DST 集群**：创建时可选“添加已有集群”或“创建新集群”，
+  后者生成 `cluster.ini` / `Master` / `Caves` / `cluster_token.txt`。
 - **DST 服务器**：只需指定集群目录，自动识别 `Master` / `Caves`；配置只读写
   常用项，不改文件结构与其它键；启动时用 steamcmd 目录自动定位 Dedicated Server，
   设置 `SteamAppId`/工作目录后直接拉起分片（无控制台窗口），停止时发送
