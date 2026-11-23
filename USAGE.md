@@ -100,34 +100,17 @@ logs/panel.log             面板自身日志
 
 ### Mods
 
-详情 → **Mods**：
-
-- 添加：Workshop ID 或链接、名称备注、启用、作用分片、是否写下载列表；
-- 列表显示每个分片的启停、是否在下载列表、是否已下载；
-- 写入 `<分片>/modoverrides.lua` 和安装目录
-  `mods/dedicated_server_mods_setup.lua`，保留已有 `configuration_options`，
-  修改前生成 `.bak-时间` 备份；
-- 修改后需重启服务器才生效。
-
-世界自动识别：一级子目录里带 `server.ini` 即为一个分片。启动不再需要配置 bat。
-
-### 定位游戏与启动
-
-- 面板在 steamcmd 目录下的 `steamapps/common/*Starve*Dedicated Server` 中查找
-  `dontstarve_dedicated_server_nullrenderer`，也兼容直接放在 steamcmd 目录内。
-- 启动时按集群目录生成命令并保存到 `dst/<id>/meta.json` 的 `launchArgs`：
-  `-persistent_storage_root <root> -conf_dir <conf> -cluster <目录名> -shard <Master|Caves> -console`。
-  真实路径通常是 `...\Klei\DoNotStarveTogether\<账号ID>\Cluster_2`，
-  其中 `<账号ID>` 由游戏自动插入，面板会跳过它（不会把它当成 `-conf_dir`）。
-- 工作目录 = 游戏根目录，环境变量自动带 `SteamAppId=322330`、`SteamGameId=322330`；
-  不依赖面板 exe 位置，移动程序目录不受影响。
-- 启动前检查 `server_port` / `master_port` 的 UDP 占用，被占用会直接提示；
-- Master 先启动，确认进程存活 2s 后再启动 Caves；
-- 分片用 `CREATE_NO_WINDOW` 启动，**不弹黑框**；stdout/stderr 写入
-  `logs/dst-<id>.log`（含 cwd/参数），游戏自身日志在各分片 `server_log.txt`。
-- **停止**：向每个分片 stdin 发送 `c_shutdown()`，最多等 10s，未退再结束进程树。
-
-详情“状态”里能看到实际执行的命令。
+- **右上角 Mods**（DST 视图）管理下载列表：
+  - 搜索 Steam 工坊（关键词）或直接添加工坊 ID/链接；
+  - 结果里的“添加”会写入游戏安装目录
+    `mods/dedicated_server_mods_setup.lua`；
+  - “移出”从下载列表删除；
+  - 服务器下次启动时自动下载这些 Mod。
+- **详情 → Mods** 只控制启用：
+  - 每个 Mod 有 Master / Caves 复选框；
+  - 勾选写入对应分片的 `modoverrides.lua`，已有配置项原样保留；
+  - 修改前自动备份 `.bak-时间`，改完需重启服务器。
+- 搜索依赖访问 `steamcommunity.com`；网络不通时会显示访问失败。
 
 ### steamcmd 更新服务端
 

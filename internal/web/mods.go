@@ -52,7 +52,6 @@ func (s *Server) buildMods(p store.DSTProfile) modsPayload {
 
 	type shardState struct {
 		enabled map[string]bool
-		entries map[string]dstpkg.ModEntry
 	}
 	states := map[string]shardState{}
 	var order []string
@@ -72,10 +71,9 @@ func (s *Server) buildMods(p store.DSTProfile) modsPayload {
 			payload.Warnings = append(payload.Warnings, fmt.Sprintf("%s: %v", sh.Name, err))
 			continue
 		}
-		state := shardState{enabled: map[string]bool{}, entries: map[string]dstpkg.ModEntry{}}
+		state := shardState{enabled: map[string]bool{}}
 		for _, e := range entries {
 			state.enabled[e.ID] = e.Enabled
-			state.entries[e.ID] = e
 			if !seen[e.ID] {
 				seen[e.ID] = true
 				order = append(order, e.ID)
@@ -83,29 +81,39 @@ func (s *Server) buildMods(p store.DSTProfile) modsPayload {
 		}
 		states[sh.Name] = state
 	}
-	sort.Strings(order)
 
 	root, _, rootErr := dstpkg.FindServer(s.paths.Settings.SteamCmdDir)
-	setupIDs := map[string]bool{}
+	setupEntries := map[string]string{}
 	if rootErr == nil {
 		payload.InstallRoot = root
 		payload.SetupPath = filepath.Join(root, "mods", dstpkg.ModSetupFile)
 		if data, err := os.ReadFile(payload.SetupPath); err == nil {
 			payload.SetupExists = true
-			setupIDs = dstpkg.SetupIDs(data)
+			setupEntries = dstpkg.SetupEntries(data)
 		} else if !os.IsNotExist(err) {
 			payload.SetupError = err.Error()
+		}
+		for id := range setupEntries {
+			if !seen[id] {
+				seen[id] = true
+				order = append(order, id)
+			}
 		}
 	} else {
 		payload.SetupError = rootErr.Error()
 	}
 
+	sort.Strings(order)
 	for _, id := range order {
-		item := modItem{ID: id, InSetup: setupIDs[id]}
+		item := modItem{ID: id}
 		if root != "" {
 			item.Name = dstpkg.ModName(root, id)
 			item.Downloaded = modDownloaded(root, s.paths.Settings.SteamCmdDir, id)
 		}
+		if item.Name == "" {
+			item.Name = setupEntries[id]
+		}
+		_, item.InSetup = setupEntries[id]
 		if st, ok := states["Master"]; ok {
 			item.MasterEnabled = st.enabled[id]
 		}
@@ -131,75 +139,6 @@ func modDownloaded(installRoot, steamDir, id string) bool {
 		}
 	}
 	return false
-}
-
-type modAddRequest struct {
-	WorkshopID string   `json:"workshopID"`
-	Name       string   `json:"name"`
-	Enabled    bool     `json:"enabled"`
-	Shards     []string `json:"shards"`
-	AddSetup   bool     `json:"addSetup"`
-}
-
-func (s *Server) handleModsAdd(w http.ResponseWriter, r *http.Request) {
-	p, err := s.dstInstance(r)
-	if err != nil {
-		fail(w, http.StatusNotFound, "%v", err)
-		return
-	}
-	var req modAddRequest
-	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		fail(w, http.StatusBadRequest, "invalid body: %v", err)
-		return
-	}
-	id := normalizeWorkshopID(req.WorkshopID)
-	if id == "" {
-		fail(w, http.StatusBadRequest, "Workshop ID 无效")
-		return
-	}
-	shards, err := s.modShards(p, req.Shards)
-	if err != nil {
-		fail(w, http.StatusBadRequest, "%v", err)
-		return
-	}
-
-	writes := []pendingWrite{}
-	for _, sh := range shards {
-		path := filepath.Join(sh.Dir, dstpkg.ModOverridesFile)
-		data, err := os.ReadFile(path)
-		if err != nil && !os.IsNotExist(err) {
-			fail(w, http.StatusBadRequest, "%s: %v", sh.Name, err)
-			return
-		}
-		out, err := dstpkg.EnsureMod(data, id, req.Enabled)
-		if err != nil {
-			fail(w, http.StatusBadRequest, "%s: %v", sh.Name, err)
-			return
-		}
-		writes = append(writes, pendingWrite{path: path, data: out})
-	}
-
-	if req.AddSetup {
-		root, _, rootErr := dstpkg.FindServer(s.paths.Settings.SteamCmdDir)
-		if rootErr != nil {
-			fail(w, http.StatusBadRequest, "无法写入下载列表: %v", rootErr)
-			return
-		}
-		setupPath := filepath.Join(root, "mods", dstpkg.ModSetupFile)
-		data, err := os.ReadFile(setupPath)
-		if err != nil && !os.IsNotExist(err) {
-			fail(w, http.StatusBadRequest, "%v", err)
-			return
-		}
-		writes = append(writes, pendingWrite{path: setupPath, data: dstpkg.AddSetup(data, id, req.Name)})
-	}
-	if err := applyWrites(writes); err != nil {
-		fail(w, http.StatusInternalServerError, "%v", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, s.buildMods(p))
 }
 
 type modUpdateRequest struct {
@@ -244,46 +183,6 @@ func (s *Server) handleModsUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writes = append(writes, pendingWrite{path: path, data: out})
-	}
-	if err := applyWrites(writes); err != nil {
-		fail(w, http.StatusInternalServerError, "%v", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, s.buildMods(p))
-}
-
-func (s *Server) handleModsDelete(w http.ResponseWriter, r *http.Request) {
-	p, err := s.dstInstance(r)
-	if err != nil {
-		fail(w, http.StatusNotFound, "%v", err)
-		return
-	}
-	id := normalizeWorkshopID(r.PathValue("mod"))
-	if id == "" {
-		fail(w, http.StatusBadRequest, "Workshop ID 无效")
-		return
-	}
-	shards, _ := dstpkg.DetectShards(p.ClusterDir)
-	writes := []pendingWrite{}
-	for _, sh := range shards {
-		path := filepath.Join(sh.Dir, dstpkg.ModOverridesFile)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		out, err := dstpkg.RemoveMod(data, id)
-		if err != nil {
-			continue
-		}
-		writes = append(writes, pendingWrite{path: path, data: out})
-	}
-	if root, _, rootErr := dstpkg.FindServer(s.paths.Settings.SteamCmdDir); rootErr == nil {
-		setupPath := filepath.Join(root, "mods", dstpkg.ModSetupFile)
-		if data, err := os.ReadFile(setupPath); err == nil {
-			if out := dstpkg.RemoveSetup(data, id); string(out) != string(data) {
-				writes = append(writes, pendingWrite{path: setupPath, data: out})
-			}
-		}
 	}
 	if err := applyWrites(writes); err != nil {
 		fail(w, http.StatusInternalServerError, "%v", err)

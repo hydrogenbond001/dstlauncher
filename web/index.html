@@ -39,6 +39,7 @@
           <span id="steamStatus" class="hint"></span>
         </div>
         <button id="newBtn" class="primary">+ 新建 frp 实例</button>
+        <button id="modsBtn" class="ghost" hidden>Mods</button>
       </div>
     </header>
 
@@ -90,8 +91,7 @@
 
           <div class="tab-body" id="tab-mods" hidden>
             <div class="actions">
-              <span class="hint">写入 modoverrides.lua 与安装目录的 dedicated_server_mods_setup.lua，重启服务器后生效</span>
-              <button id="addMod" class="primary">+ 添加 Mod</button>
+              <span class="hint">下载列表由右上角 Mods 管理；这里勾选每个分片是否启用，重启服务器后生效</span>
             </div>
             <div id="modsList"></div>
           </div>
@@ -208,27 +208,31 @@
   </form>
 </dialog>
 
-<dialog id="modDialog">
-  <form id="modForm">
-    <div class="dialog-head">
-      <h2>添加 Mod</h2>
-      <button type="button" id="closeMod" class="ghost" aria-label="关闭">×</button>
-    </div>
-    <div class="row">
-      <label>Workshop ID 或链接 <input name="modId" required placeholder="378160973 或 ...?id=378160973"></label>
-      <label>名称（可选） <input name="modName"></label>
-    </div>
-    <div class="row">
-      <label class="check-label"><span>启用</span><input type="checkbox" name="modEnabled" checked></label>
-      <label class="check-label"><span>Master</span><input type="checkbox" name="modMaster" checked></label>
-      <label class="check-label"><span>Caves</span><input type="checkbox" name="modCaves" checked></label>
-      <label class="check-label"><span>写入下载列表</span><input type="checkbox" name="modSetup" checked></label>
-    </div>
-    <div class="actions">
-      <button type="submit" class="primary">添加</button>
-      <span id="modHint" class="hint"></span>
-    </div>
-  </form>
+<dialog id="globalModsDialog">
+  <div class="dialog-head">
+    <h2>Mods</h2>
+    <button type="button" id="closeGlobalMods" class="ghost" aria-label="关闭">×</button>
+  </div>
+
+  <div class="row">
+    <label>搜索 Steam 工坊 <input id="modSearch" placeholder="关键词，例如 global positions"></label>
+    <button type="button" id="modSearchBtn" class="primary">搜索</button>
+    <button type="button" id="modTrendingBtn" class="ghost">热门</button>
+  </div>
+  <div id="modSearchResults" class="mod-results"></div>
+
+  <div class="row">
+    <label>手动添加 ID <input id="manualModId" placeholder="378160973 或工坊链接"></label>
+    <label>名称（可选） <input id="manualModName"></label>
+    <button type="button" id="manualModAdd" class="ghost">添加</button>
+  </div>
+
+  <div class="panel-head">
+    <h3>下载列表</h3>
+    <span id="modSetupPath" class="hint mono ellipsis"></span>
+  </div>
+  <div id="modSetupList"></div>
+  <p class="hint">写入游戏安装目录 mods/dedicated_server_mods_setup.lua；服务器启动时自动下载。</p>
 </dialog>
 
 <template id="proxyRow">

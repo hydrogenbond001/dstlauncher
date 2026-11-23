@@ -228,6 +228,7 @@ pre {
   padding: 10px 12px;
   margin-bottom: 8px;
 }
+.mod-results { max-height: 300px; overflow: auto; margin-bottom: 8px; }
 .mod-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .mod-info strong { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

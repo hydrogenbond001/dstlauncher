@@ -165,17 +165,31 @@ func RemoveMod(data []byte, id string) ([]byte, error) {
 	return nil, fmt.Errorf("mod %s 不在 modoverrides.lua 中", id)
 }
 
-// SetupIDs lists ServerModSetup("id") entries, ignoring commented lines.
-func SetupIDs(data []byte) map[string]bool {
-	out := map[string]bool{}
+// SetupEntries lists ServerModSetup("id") entries with their optional
+// "-- name" comment, ignoring commented-out lines.
+func SetupEntries(data []byte) map[string]string {
+	out := map[string]string{}
 	for _, line := range splitLines(string(data)) {
 		trim := strings.TrimSpace(line)
 		if trim == "" || strings.HasPrefix(trim, "--") {
 			continue
 		}
 		if m := setupRe.FindStringSubmatch(trim); m != nil {
-			out[m[1]] = true
+			name := ""
+			rest := strings.TrimSpace(trim[len(m[0]):])
+			if i := strings.Index(rest, "--"); i >= 0 {
+				name = strings.TrimSpace(rest[i+2:])
+			}
+			out[m[1]] = name
 		}
+	}
+	return out
+}
+
+func SetupIDs(data []byte) map[string]bool {
+	out := map[string]bool{}
+	for id := range SetupEntries(data) {
+		out[id] = true
 	}
 	return out
 }

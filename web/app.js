@@ -176,6 +176,7 @@ function switchView(next) {
     : '集群目录、bat 启动、日志与常用配置';
   $('#newBtn').textContent = next === 'frp' ? '+ 新建 frp 实例' : '+ 新建 DST 服务器';
   $('#steamBar').hidden = next !== 'dst';
+  $('#modsBtn').hidden = next !== 'dst';
   closeDetail();
   renderList();
   if (next === 'dst') {
@@ -531,7 +532,7 @@ function renderMods(data) {
     ? `<p class="small warn">下载列表不可用：${esc(data.setupError)}</p>`
     : '';
   if (!(data.mods || []).length) {
-    wrap.innerHTML = warning + '<p class="empty">还没有 Mod。点“添加 Mod”写入 modoverrides.lua。</p>';
+    wrap.innerHTML = warning + '<p class="empty">还没有 Mod。用右上角“Mods”搜索并加入下载列表。</p>';
     return;
   }
   wrap.innerHTML = warning + (data.mods || []).map(m => {
@@ -544,98 +545,168 @@ function renderMods(data) {
         <span class="chip">${m.downloaded ? '已下载' : '未下载'}</span>
       </div>
       <div class="actions">
-        <button class="src ${m.masterEnabled ? 'active' : ''}" data-mod-toggle="Master" data-id="${esc(m.id)}" ${hasMaster ? '' : 'disabled'}>Master ${m.masterEnabled ? '开' : '关'}</button>
-        <button class="src ${m.cavesEnabled ? 'active' : ''}" data-mod-toggle="Caves" data-id="${esc(m.id)}" ${hasCaves ? '' : 'disabled'}>Caves ${m.cavesEnabled ? '开' : '关'}</button>
-        <button class="ghost danger" data-mod-del="${esc(m.id)}">删除</button>
+        <label class="check-label"><span>Master</span><input type="checkbox" data-mod-enable="Master" data-id="${esc(m.id)}" ${m.masterEnabled ? 'checked' : ''} ${hasMaster ? '' : 'disabled'}></label>
+        <label class="check-label"><span>Caves</span><input type="checkbox" data-mod-enable="Caves" data-id="${esc(m.id)}" ${m.cavesEnabled ? 'checked' : ''} ${hasCaves ? '' : 'disabled'}></label>
       </div>
     </div>`;
   }).join('');
 }
 
-$('#modsList').addEventListener('click', async (e) => {
-  if (current.kind !== 'dst' || !modsData) return;
-  const del = e.target.closest('[data-mod-del]');
-  if (del) {
-    if (!confirm(`删除 Mod ${del.dataset.modDel} 并移出下载列表？`)) return;
-    try {
-      await api(`/api/dst/${current.id}/mods/${del.dataset.modDel}`, { method: 'DELETE' });
-      await loadMods();
-      banner('已删除，重启服务器后生效', true);
-    } catch (err) {
-      banner(err.message);
-    }
-    return;
-  }
-  const tog = e.target.closest('[data-mod-toggle]');
-  if (!tog) return;
-  const id = tog.dataset.id;
-  const shard = tog.dataset.modToggle;
-  const mod = (modsData.mods || []).find(m => m.id === id);
-  if (!mod) return;
-  const enabled = shard === 'Master' ? mod.masterEnabled : mod.cavesEnabled;
+$('#modsList').addEventListener('change', async (e) => {
+  if (current.kind !== 'dst') return;
+  const cb = e.target.closest('[data-mod-enable]');
+  if (!cb) return;
+  const id = cb.dataset.id;
+  const shard = cb.dataset.modEnable;
+  cb.disabled = true;
   try {
     await api(`/api/dst/${current.id}/mods/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: !enabled, shards: [shard] }),
+      body: JSON.stringify({ enabled: cb.checked, shards: [shard] }),
     });
     await loadMods();
-    banner('已写入，重启服务器后生效', true);
+    banner('已保存，重启服务器后生效', true);
   } catch (err) {
+    cb.checked = !cb.checked;
     banner(err.message);
+  } finally {
+    cb.disabled = false;
   }
 });
 
-$('#addMod').addEventListener('click', () => {
-  if (!modsData) {
-    banner('Mod 列表还没加载完成');
-    return;
-  }
-  const el = $('#modForm').elements;
-  el.modId.value = '';
-  el.modName.value = '';
-  el.modEnabled.checked = true;
-  el.modSetup.checked = true;
-  el.modMaster.checked = modsData.shards.includes('Master');
-  const hasCaves = modsData.shards.includes('Caves');
-  el.modCaves.checked = hasCaves;
-  el.modCaves.disabled = !hasCaves;
-  $('#modHint').textContent = '';
-  $('#modDialog').showModal();
-});
+/* ---- global mods / Steam workshop ---- */
 
-$('#closeMod').addEventListener('click', () => $('#modDialog').close());
+let globalMods = null;
+let modSearchResults = [];
 
-$('#modForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  if (current.kind !== 'dst') return;
-  const el = e.target.elements;
-  const shards = [];
-  if (el.modMaster.checked) shards.push('Master');
-  if (el.modCaves.checked && !el.modCaves.disabled) shards.push('Caves');
-  if (!shards.length) {
-    $('#modHint').textContent = '至少选择一个分片';
-    return;
-  }
-  $('#modHint').textContent = '写入中…';
+async function loadGlobalMods() {
   try {
-    await api(`/api/dst/${current.id}/mods`, {
+    globalMods = await api('/api/mods/setup');
+    renderSetupList();
+    renderSearchResults();
+  } catch (err) {
+    $('#modSetupList').innerHTML = `<p class="small warn">${esc(err.message)}</p>`;
+  }
+}
+
+function renderSetupList() {
+  const wrap = $('#modSetupList');
+  if (!globalMods) return;
+  $('#modSetupPath').textContent = globalMods.setupPath || '';
+  const err = globalMods.error ? `<p class="small warn">${esc(globalMods.error)}</p>` : '';
+  if (!(globalMods.mods || []).length) {
+    wrap.innerHTML = err + '<p class="empty">下载列表为空</p>';
+    return;
+  }
+  wrap.innerHTML = err + globalMods.mods.map(m => `
+    <div class="mod-row">
+      <div class="mod-info">
+        <strong>${esc(m.name || m.id)}</strong>
+        <span class="mono small muted">${esc(m.id)}</span>
+        <span class="chip">${m.downloaded ? '已下载' : '未下载'}</span>
+      </div>
+      <div class="actions"><button class="ghost danger" data-setup-del="${esc(m.id)}">移出</button></div>
+    </div>`).join('');
+}
+
+function renderSearchResults() {
+  const wrap = $('#modSearchResults');
+  if (!modSearchResults.length) {
+    wrap.innerHTML = wrap.dataset.searched === '1' ? '<p class="empty">没有结果</p>' : '';
+    return;
+  }
+  const added = new Set((globalMods?.mods || []).map(m => m.id));
+  wrap.innerHTML = modSearchResults.map(r => `
+    <div class="mod-row">
+      <div class="mod-info">
+        <strong title="${esc(r.title)}">${esc(r.title)}</strong>
+        <span class="mono small muted">${esc(r.id)}</span>
+      </div>
+      <div class="actions">
+        <a class="hint" href="${esc(r.url)}" target="_blank" rel="noopener">工坊</a>
+        <button class="${added.has(r.id) ? 'ghost' : 'primary'}" data-setup-add="${esc(r.id)}" data-name="${esc(r.title)}" ${added.has(r.id) ? 'disabled' : ''}>${added.has(r.id) ? '已添加' : '添加'}</button>
+      </div>
+    </div>`).join('');
+}
+
+async function doModSearch(q) {
+  const wrap = $('#modSearchResults');
+  wrap.dataset.searched = '0';
+  wrap.textContent = '搜索中…';
+  try {
+    const data = await api('/api/mods/search?q=' + encodeURIComponent(q));
+    modSearchResults = data.results || [];
+    wrap.dataset.searched = '1';
+    renderSearchResults();
+  } catch (err) {
+    wrap.innerHTML = `<p class="small warn">${esc(err.message)}</p>`;
+  }
+}
+
+async function addSetupMod(id, name) {
+  try {
+    globalMods = await api('/api/mods/setup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        workshopID: el.modId.value.trim(),
-        name: el.modName.value.trim(),
-        enabled: el.modEnabled.checked,
-        shards,
-        addSetup: el.modSetup.checked,
-      }),
+      body: JSON.stringify({ workshopID: id, name }),
     });
-    $('#modDialog').close();
-    await loadMods();
-    banner('Mod 已添加，重启服务器后生效', true);
+    renderSetupList();
+    renderSearchResults();
+    if (current.kind === 'dst' && !$('#tab-mods').hidden) await loadMods();
+    banner('已加入下载列表，服务器启动时下载', true);
   } catch (err) {
-    $('#modHint').textContent = err.message;
+    banner('添加失败：' + err.message);
   }
+}
+
+async function removeSetupMod(id) {
+  globalMods = await api(`/api/mods/setup/${id}`, { method: 'DELETE' });
+  renderSetupList();
+  renderSearchResults();
+  if (current.kind === 'dst' && !$('#tab-mods').hidden) await loadMods();
+  banner('已移出下载列表', true);
+}
+
+$('#globalModsDialog').addEventListener('click', async (e) => {
+  const add = e.target.closest('[data-setup-add]');
+  if (add) {
+    await addSetupMod(add.dataset.setupAdd, add.dataset.name);
+    return;
+  }
+  const del = e.target.closest('[data-setup-del]');
+  if (del) {
+    if (!confirm(`把 ${del.dataset.setupDel} 移出下载列表？`)) return;
+    try {
+      await removeSetupMod(del.dataset.setupDel);
+    } catch (err) {
+      banner(err.message);
+    }
+  }
+});
+
+$('#modsBtn').addEventListener('click', async () => {
+  $('#globalModsDialog').showModal();
+  await loadGlobalMods();
+});
+$('#closeGlobalMods').addEventListener('click', () => $('#globalModsDialog').close());
+$('#modSearchBtn').addEventListener('click', () => doModSearch($('#modSearch').value.trim()));
+$('#modTrendingBtn').addEventListener('click', () => {
+  $('#modSearch').value = '';
+  doModSearch('');
+});
+$('#modSearch').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    doModSearch($('#modSearch').value.trim());
+  }
+});
+$('#manualModAdd').addEventListener('click', async () => {
+  const id = $('#manualModId').value.trim();
+  if (!id) return;
+  await addSetupMod(id, $('#manualModName').value.trim());
+  $('#manualModId').value = '';
+  $('#manualModName').value = '';
 });
 
 /* ---- create dialog ---- */
