@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	dstpkg "frpconsole/internal/dst"
 )
@@ -94,7 +95,13 @@ func (s *Server) handleSetupAdd(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "%v", err)
 		return
 	}
-	if err := dstpkg.WriteFileBackup(path, dstpkg.AddSetup(data, id, req.Name)); err != nil {
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		if info, err := steamModDetails(id); err == nil {
+			name = info.Title
+		}
+	}
+	if err := dstpkg.WriteFileBackup(path, dstpkg.AddSetup(data, id, name)); err != nil {
 		fail(w, http.StatusInternalServerError, "%v", err)
 		return
 	}

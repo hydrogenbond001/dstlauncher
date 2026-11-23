@@ -622,6 +622,8 @@ function renderSearchResults() {
       <div class="mod-info">
         <strong title="${esc(r.title)}">${esc(r.title)}</strong>
         <span class="mono small muted">${esc(r.id)}</span>
+        ${r.size ? `<span class="chip">${(r.size / 1048576).toFixed(1)} MB</span>` : ''}
+        ${r.subscriptions ? `<span class="chip">${r.subscriptions} 订阅</span>` : ''}
       </div>
       <div class="actions">
         <a class="hint" href="${esc(r.url)}" target="_blank" rel="noopener">工坊</a>
@@ -687,7 +689,21 @@ $('#globalModsDialog').addEventListener('click', async (e) => {
 
 $('#modsBtn').addEventListener('click', async () => {
   $('#globalModsDialog').showModal();
+  await loadSettings();
   await loadGlobalMods();
+});
+
+$('#saveSteamKey').addEventListener('click', async () => {
+  try {
+    await api('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ steamApiKey: $('#steamApiKey').value.trim() }),
+    });
+    banner('Steam API Key 已保存', true);
+  } catch (err) {
+    banner(err.message);
+  }
 });
 $('#closeGlobalMods').addEventListener('click', () => $('#globalModsDialog').close());
 $('#modSearchBtn').addEventListener('click', () => doModSearch($('#modSearch').value.trim()));
@@ -879,6 +895,8 @@ async function loadSettings() {
     const s = await api('/api/settings');
     const input = $('#steamcmdDir');
     if (document.activeElement !== input) input.value = s.steamcmdDir || '';
+    const keyInput = $('#steamApiKey');
+    if (keyInput && document.activeElement !== keyInput) keyInput.value = s.steamApiKey || '';
   } catch (err) {
     banner(err.message);
   }

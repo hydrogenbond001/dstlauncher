@@ -102,6 +102,9 @@ logs/panel.log             面板自身日志
 
 - **右上角 Mods**（DST 视图）管理下载列表：
   - 搜索 Steam 工坊（关键词）或直接添加工坊 ID/链接；
+  - **数字 ID** 走 `GetPublishedFileDetails`，不需要 Key；
+  - **关键词搜索** 建议在窗口内填 Steam API Key（走 `QueryFiles`），
+    留空则尝试解析 Steam 社区网页；
   - 结果里的“添加”会写入游戏安装目录
     `mods/dedicated_server_mods_setup.lua`；
   - “移出”从下载列表删除；
@@ -110,7 +113,8 @@ logs/panel.log             面板自身日志
   - 每个 Mod 有 Master / Caves 复选框；
   - 勾选写入对应分片的 `modoverrides.lua`，已有配置项原样保留；
   - 修改前自动备份 `.bak-时间`，改完需重启服务器。
-- 搜索依赖访问 `steamcommunity.com`；网络不通时会显示访问失败。
+- 结果显示大小、订阅数；搜索失败会提示网络或 Key 问题。
+- 下载仍走官方机制：写入 `dedicated_server_mods_setup.lua`，服务器下次启动时下载。
 
 ### steamcmd 更新服务端
 
