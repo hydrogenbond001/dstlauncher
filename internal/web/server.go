@@ -1175,6 +1175,7 @@ func (s *Server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"steamcmdDir": s.paths.Settings.SteamCmdDir,
 		"steamApiKey": s.paths.Settings.SteamAPIKey,
+		"proxy":       s.paths.Settings.Proxy,
 	})
 }
 
@@ -1182,6 +1183,7 @@ func (s *Server) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SteamCmdDir *string `json:"steamcmdDir"`
 		SteamAPIKey *string `json:"steamApiKey"`
+		Proxy       *string `json:"proxy"`
 	}
 	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
 	dec.DisallowUnknownFields()
@@ -1195,6 +1197,9 @@ func (s *Server) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	if req.SteamAPIKey != nil {
 		s.paths.Settings.SteamAPIKey = strings.TrimSpace(*req.SteamAPIKey)
 	}
+	if req.Proxy != nil {
+		s.paths.Settings.Proxy = strings.TrimSpace(*req.Proxy)
+	}
 	if err := s.paths.SaveSettings(); err != nil {
 		fail(w, http.StatusInternalServerError, "save settings: %v", err)
 		return
@@ -1202,6 +1207,7 @@ func (s *Server) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"steamcmdDir": s.paths.Settings.SteamCmdDir,
 		"steamApiKey": s.paths.Settings.SteamAPIKey,
+		"proxy":       s.paths.Settings.Proxy,
 	})
 }
 

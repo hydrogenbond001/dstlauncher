@@ -693,6 +693,19 @@ $('#modsBtn').addEventListener('click', async () => {
   await loadGlobalMods();
 });
 
+$('#saveNetProxy').addEventListener('click', async () => {
+  try {
+    await api('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proxy: $('#netProxy').value.trim() }),
+    });
+    banner('代理已保存', true);
+  } catch (err) {
+    banner(err.message);
+  }
+});
+
 $('#saveSteamKey').addEventListener('click', async () => {
   try {
     await api('/api/settings', {
@@ -897,6 +910,8 @@ async function loadSettings() {
     if (document.activeElement !== input) input.value = s.steamcmdDir || '';
     const keyInput = $('#steamApiKey');
     if (keyInput && document.activeElement !== keyInput) keyInput.value = s.steamApiKey || '';
+    const proxyInput = $('#netProxy');
+    if (proxyInput && document.activeElement !== proxyInput) proxyInput.value = s.proxy || '';
   } catch (err) {
     banner(err.message);
   }

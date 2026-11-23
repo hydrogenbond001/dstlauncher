@@ -15,6 +15,7 @@ type Settings struct {
 	AutoOpen    bool   `json:"autoOpen"`
 	SteamCmdDir string `json:"steamcmdDir,omitempty"`
 	SteamAPIKey string `json:"steamApiKey,omitempty"`
+	Proxy       string `json:"proxy,omitempty"`
 }
 
 // Paths is the portable layout rooted at the directory holding the executable.

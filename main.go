@@ -32,7 +32,7 @@ import (
 //go:embed web
 var assets embed.FS
 
-var version = "0.6.2"
+var version = "0.6.3"
 
 func main() {
 	var (
