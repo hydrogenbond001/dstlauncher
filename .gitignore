@@ -4,6 +4,7 @@ devdata/
 *.log
 
 # runtime data (created next to the executable)
+/data/
 /conf/
 /profiles/
 /dst/
