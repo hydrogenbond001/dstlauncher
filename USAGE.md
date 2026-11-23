@@ -15,12 +15,12 @@
 3. 托盘右键菜单：打开面板 / 打开数据目录 / 退出。
 4. 再次双击 exe 只会打开已运行的面板，不会起第二个进程。
 
-启动异常时看 `logs\panel.log`（GUI 程序没有控制台可看）。
+启动异常时看 `data\logs\panel.log`（GUI 程序没有控制台可看）。
 
 ### Linux
 
 ```bash
-./dstlauncher            # 控制台运行，日志同时写 logs/panel.log
+./dstlauncher            # 控制台运行，日志同时写 data/logs/panel.log
 ./dstlauncher -no-open   # 不自动开浏览器
 ```
 
@@ -29,14 +29,14 @@ Ctrl+C 会停止所有实例并退出。
 ### 首次运行生成
 
 ```text
-conf/panel.json            监听地址、是否自动开浏览器
-bin/frpc, bin/frps         从 exe 内释放，可手工替换
-profiles/<id>/             每个实例的配置与元数据
-logs/<id>.log              实例输出
-logs/panel.log             面板自身日志
+data/panel.json            监听地址、是否自动开浏览器
+data/bin/frpc, data/bin/frps         从 exe 内释放，可手工替换
+data/profiles/<id>/             每个实例的配置与元数据
+data/logs/<id>.log              实例输出
+data/logs/panel.log             面板自身日志
 ```
 
-面板默认只监听 `127.0.0.1:7600`；改端口编辑 `conf/panel.json` 的 `listen`，
+面板默认只监听 `127.0.0.1:7600`；改端口编辑 `data/panel.json` 的 `listen`，
 或用 `-listen 127.0.0.1:7600` 临时覆盖。
 
 ## 2. 创建 frpc 实例（客户端）
@@ -145,10 +145,10 @@ DST 顶部横栏：
 
 | 按钮 | 行为 |
 |---|---|
-| 启动 | `frpc/frps -c profiles/<id>/<config>`，工作目录为该 profile |
+| 启动 | `frpc/frps -c data/profiles/<id>/<config>`，工作目录为该 profile |
 | 停止 | frpc 先调 `/api/stop` 优雅退出，3s 未退再强杀；frps 直接终止 |
 | 重启 | 停止后立即启动（改完配置最稳妥的方式） |
-| 删除 | 先停进程，再删 `profiles/<id>/` 和 `logs/<id>.log`，需二次确认 |
+| 删除 | 先停进程，再删 `data/profiles/<id>/` 和 `data/logs/<id>.log`，需二次确认 |
 | 配置 | 打开详情页（配置 / 日志 / 状态） |
 
 启动后卡片绿点变亮，显示 pid 与 dashboard 端口；Windows 下不会弹控制台窗口。
@@ -184,7 +184,7 @@ http://127.0.0.1:<面板端口>/static/
 
 ## 8. 日志与状态
 
-- **日志**：frp 写 `logs/<id>.log`，DST 写 `logs/dst-<id>.log`；页面每 1.5s
+- **日志**：frp 写 `data/logs/<id>.log`，DST 写 `data/logs/dst-<id>.log`；页面每 1.5s
   增量拉取，已去除 ANSI 颜色，保留最近 5000 行，自动滚到底部。
 - **状态**：进程 running/pid/启动时间/最后错误；frpc 额外展示 `/api/status`
   （每个代理 running/error），frps 展示 `/api/v2/proxies`。
@@ -199,14 +199,14 @@ http://127.0.0.1:<面板端口>/static/
 
 ## 10. 升级 frp 二进制
 
-`bin/frpc(.exe)`、`bin/frps(.exe)` 首次运行从 exe 内解压；已存在则跳过。
-要换版本：停掉相关实例 → 覆盖 `bin/` 下的文件 → 重新启动实例。
+`data/bin/frpc(.exe)`、`data/bin/frps(.exe)` 首次运行从 exe 内解压；已存在则跳过。
+要换版本：停掉相关实例 → 覆盖 `data/bin/` 下的文件 → 重新启动实例。
 面板不会覆盖你手工放入的二进制。
 
 ## 11. 构建与打包
 
 ```bash
-# 开发构建（不嵌入 frp，读 bin/ 或 PATH）
+# 开发构建（不嵌入 frp，读 data/bin/ 或 PATH）
 go build -o dstlauncher .
 
 # 发布构建：linux/amd64 + windows/amd64
@@ -230,7 +230,7 @@ VERSION=0.2.1 ./build.sh
 | 现象 | 原因 / 处理 |
 |---|---|
 | Windows 启停实例弹黑框 | 0.2.0 及更早的 bug；升级 0.2.1。若仍出现，先结束残留的旧 `dstlauncher.exe`/`frpc.exe` |
-| 双击后什么都没发生 | 看 `logs/panel.log`；若面板已在运行，第二次只打开已有面板，属正常 |
+| 双击后什么都没发生 | 看 `data/logs/panel.log`；若面板已在运行，第二次只打开已有面板，属正常 |
 | DST 启动报“集群目录不存在/没有 cluster.ini” | 选到 `Cluster_2` 这一层，不要选 `DoNotStarveTogether` 或 `bin64` |
 | 启动报“未设置 steamcmd 目录” | 在 DST 顶部横栏填目录并保存 |
 | 启动报“未找到 Don't Starve Together Dedicated Server” | 先点“更新服务端”安装 343050，或确认游戏在 `<steamcmd>/steamapps/common` 下 |
@@ -240,11 +240,11 @@ VERSION=0.2.1 ./build.sh
 | 日志 `databundles/*.zip skipped` 且 `main.lua` 加载失败 | 工作目录必须是对应 `bin`/`bin64`（0.5.2 起已按 exe 所在目录启动） |
 | 启动报“UDP 端口已被占用” | 旧服务器/其它程序占着端口；先在任务管理器结束旧的 DST 进程 |
 | 日志出现 `CFileWriterThread` Assertion | 通常是进程提前退出后的次生错误；先看日志更上面的配置/路径错误，并确认端口未被占用 |
-| 面板端口被其他程序占用 | 弹错误对话框；改 `conf/panel.json` 的 `listen` 或加 `-listen` 换端口 |
+| 面板端口被其他程序占用 | 弹错误对话框；改 `data/panel.json` 的 `listen` 或加 `-listen` 换端口 |
 | 代理状态 `port not allowed` | 该 remotePort 不在 frps 的 `allowPorts` 内 |
 | dashboard 401 | 用 TOML 里的 `webServer.user/password`；默认 admin |
 | `config rejected by frpc` | 按提示修正；未知字段会被严格模式拒绝 |
-| `frpc not found` | `bin/` 和 exe 同级都没有；删掉 `bin/` 让内置版本重新解压，或手工放入 |
+| `frpc not found` | `data/bin/` 和 exe 同级都没有；删掉 `data/bin/` 让内置版本重新解压，或手工放入 |
 | 托盘没有图标 | 远程会话/锁屏下可能注册失败；面板照常可用，退出用页面按钮或任务管理器 |
 | 改了配置但没生效 | 运行中的 frpc 会自动 reload；frps 需要重启；dashboard 表单改的是 store.json |
 | 日志乱码/带颜色码 | 面板返回日志时已去 ANSI；直接看 `logs/*.log` 可能仍带颜色，属正常 |
@@ -252,5 +252,5 @@ VERSION=0.2.1 ./build.sh
 ## 13. 安全
 
 - 面板与 dashboard 都只绑定 `127.0.0.1`；不要做公网反向代理。
-- dashboard 密码明文存在 `profiles/<id>/frpc.toml`，注意本机权限。
+- dashboard 密码明文存在 `data/profiles/<id>/frpc.toml`，注意本机权限。
 - `POST /api/quit` 无鉴权，但仅回环可达；它等价于“停止一切并退出”。

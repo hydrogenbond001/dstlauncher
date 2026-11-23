@@ -32,12 +32,12 @@ import (
 //go:embed web
 var assets embed.FS
 
-var version = "0.6.2"
+var version = "0.6.4"
 
 func main() {
 	var (
-		dataDir = flag.String("data", "", "data directory (default: directory of the executable)")
-		listen  = flag.String("listen", "", "listen address, overrides conf/panel.json")
+		dataDir = flag.String("data", "", "base directory (default: directory of the executable)")
+		listen  = flag.String("listen", "", "listen address, overrides data/panel.json")
 		noOpen  = flag.Bool("no-open", false, "do not open the browser on startup")
 		showVer = flag.Bool("version", false, "print version and exit")
 	)
@@ -124,7 +124,8 @@ func main() {
 	}()
 
 	log.Printf("dstlauncher %s", version)
-	log.Printf("data dir: %s", paths.Root)
+	log.Printf("root: %s", paths.Root)
+	log.Printf("data: %s", paths.Data)
 	log.Printf("panel:    %s", url)
 	if paths.Settings.AutoOpen && !*noOpen {
 		if err := openBrowser(url); err != nil {
@@ -144,7 +145,7 @@ func main() {
 	if traySupported {
 		// Never block shutdown on the tray message loop: if tray setup fails
 		// (remote session, locked desktop) the panel must still be quittable.
-		go trayRun(url, paths.Root, doQuit)
+		go trayRun(url, paths.Data, doQuit)
 	}
 
 	select {

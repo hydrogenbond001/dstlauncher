@@ -8,8 +8,8 @@
 
 ## 特性
 
-- **单 exe、零安装**：首次运行在 exe 同级生成 `conf/ profiles/ logs/ bin/`。
-- **自带 frp 二进制**：构建时按平台把 frpc/frps gzip 进 exe，首次运行释放到 `bin/`；
+- **单 exe、零安装**：首次运行在 exe 同级生成一个 `data/` 文件夹。
+- **自带 frp 二进制**：构建时按平台把 frpc/frps gzip 进 exe，首次运行释放到 `data/bin/`；
   已存在则跳过，方便手动替换版本。
 - **实例管理**：创建 / 启动 / 停止 / 重启 / 删除，配置与会话数据全部留在数据目录。
 - **可视化参数编辑**：表单创建常用参数；配置页直接编辑 TOML，保存前跑
@@ -42,23 +42,24 @@
 ## 数据布局
 
 ```text
-dstlauncher(.exe)          # 唯一需要分发的文件
-conf/panel.json            # 监听地址 / 是否自动开浏览器
-bin/frpc, bin/frps         # 首次运行从 exe 内释放；可手工替换
-profiles/<id>/
-    meta.json
-    frpc.toml | frps.toml  # 真实配置，可直接改
-    frpc.store.json        # frpc 的 store（dashboard 表单编辑代理时生成）
-dst/<id>/meta.json         # 指向外部集群目录 + 生成的 launchArgs（不复制集群文件）
-logs/<id>.log              # frp 子进程 stdout/stderr
-logs/dst-<id>.log          # DST 子进程 stdout/stderr
-logs/panel.log             # 面板自身日志（Windows GUI 构建唯一启动日志）
+dstlauncher(.exe)              # 唯一需要分发的文件
+data/                          # 所有运行状态，删掉即恢复初始状态
+    panel.json                 # 监听地址 / 是否自动开浏览器
+    bin/frpc, bin/frps         # 首次运行从 exe 内释放；可手工替换
+    profiles/<id>/
+        meta.json
+        frpc.toml | frps.toml  # 真实配置，可直接改
+        frpc.store.json        # frpc 的 store（dashboard 表单编辑代理时生成）
+    dst/<id>/meta.json         # 指向外部集群目录 + 生成的 launchArgs
+    logs/<id>.log              # frp 子进程 stdout/stderr
+    logs/dst-<id>.log          # DST 子进程 stdout/stderr
+    logs/panel.log             # 面板自身日志（Windows GUI 构建唯一启动日志）
 ```
 
 ## 构建
 
 ```bash
-# 开发构建（不嵌入 frp，读取 bin/ 或 PATH）
+# 开发构建（不嵌入 frp，读取 data/bin/ 或 PATH）
 go build -o dstlauncher .
 
 # 发布构建：linux/amd64 + windows/amd64 + linux/armv7l
@@ -99,7 +100,7 @@ git push origin v0.5.0
 ## 运行
 
 ```bash
-./dstlauncher                  # 数据目录 = exe 所在目录；日志同时写 logs/panel.log
+./dstlauncher                  # 根目录 = exe 所在目录；状态在 data/，日志写 data/logs/panel.log
 ./dstlauncher -listen 127.0.0.1:7600 -no-open
 ```
 
@@ -107,15 +108,15 @@ Windows：双击 `dstlauncher.exe`，**不弹控制台**，直接在托盘出现
 
 - 托盘右键：打开面板 / 打开数据目录 / 退出。
 - 再次双击 exe：只打开已在运行的面板，不会起第二个进程。
-- 启动日志写在 `logs/panel.log`（GUI 程序没有控制台可看）。
+- 启动日志写在 `data/logs/panel.log`（GUI 程序没有控制台可看）。
 - 调试需要控制台时：`WINDOWS_CONSOLE=1 ./build.sh`。
 
 参数：
 
 | 参数 | 说明 |
 |---|---|
-| `-data <dir>` | 覆盖数据目录（开发调试用） |
-| `-listen <addr>` | 覆盖 `conf/panel.json` 的监听地址 |
+| `-data <dir>` | 覆盖根目录（状态写入 `<dir>/data/`，开发调试用） |
+| `-listen <addr>` | 覆盖 `data/panel.json` 的监听地址 |
 | `-no-open` | 不自动打开浏览器 |
 | `-version` | 打印版本 |
 
@@ -134,7 +135,7 @@ Windows：双击 `dstlauncher.exe`，**不弹控制台**，直接在托盘出现
 ```text
 main.go                便携布局、HTTP 启动、浏览器打开
 internal/app           路径/设置/原子写/二进制查找
-internal/store         profiles/<id>/meta.json
+internal/store         data/profiles/<id>/meta.json
 internal/frpx          TOML 生成、verify、dashboard 认证解析、admin API
 internal/dst           DST 集群识别、INI 读写、steamcmd/服务端定位、启动参数生成
 internal/unit          子进程监管（日志、状态、优雅停止→强杀、进程树终止）

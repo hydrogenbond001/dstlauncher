@@ -18,16 +18,17 @@ type Settings struct {
 }
 
 // Paths is the portable layout rooted at the directory holding the executable.
+// All mutable state lives in one data folder so the root stays clean:
 //
 //	<root>/frp-console(.exe)
-//	<root>/conf/panel.json
-//	<root>/profiles/<id>/{frpc|frps}.toml, meta.json
-//	<root>/dst/<id>/{meta.json, config/}
-//	<root>/logs/<id>.log, dst-<id>.log
-//	<root>/bin/frpc(.exe), frps(.exe)
+//	<root>/data/panel.json
+//	<root>/data/profiles/<id>/{frpc|frps}.toml, meta.json
+//	<root>/data/dst/<id>/{meta.json, config/}
+//	<root>/data/logs/<id>.log, dst-<id>.log
+//	<root>/data/bin/frpc(.exe), frps(.exe)
 type Paths struct {
 	Root     string
-	Conf     string
+	Data     string
 	Profiles string
 	DST      string
 	Logs     string
@@ -42,16 +43,23 @@ func Init(root string) (*Paths, error) {
 	if err != nil {
 		return nil, err
 	}
+	data := filepath.Join(abs, "data")
+	if err := os.MkdirAll(data, 0o755); err != nil {
+		return nil, err
+	}
+	if err := migrateLegacy(abs, data); err != nil {
+		return nil, err
+	}
 	p := &Paths{
 		Root:         abs,
-		Conf:         filepath.Join(abs, "conf"),
-		Profiles:     filepath.Join(abs, "profiles"),
-		DST:          filepath.Join(abs, "dst"),
-		Logs:         filepath.Join(abs, "logs"),
-		Bin:          filepath.Join(abs, "bin"),
-		settingsPath: filepath.Join(abs, "conf", "panel.json"),
+		Data:         data,
+		Profiles:     filepath.Join(data, "profiles"),
+		DST:          filepath.Join(data, "dst"),
+		Logs:         filepath.Join(data, "logs"),
+		Bin:          filepath.Join(data, "bin"),
+		settingsPath: filepath.Join(data, "panel.json"),
 	}
-	for _, dir := range []string{p.Conf, p.Profiles, p.DST, p.Logs, p.Bin} {
+	for _, dir := range []string{p.Profiles, p.DST, p.Logs, p.Bin} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err
 		}

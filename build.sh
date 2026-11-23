@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Builds portable, self-contained dstlauncher executables per platform.
 # Each output embeds that platform's frpc/frps (gzipped), so the exe alone is
-# enough: on first run it creates conf/, profiles/, logs/, bin/ next to itself.
+# enough: on first run it creates a single data/ folder next to itself.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
-VERSION="${VERSION:-0.6.2}"
+VERSION="${VERSION:-0.6.4}"
 FRP_VERSION="${FRP_VERSION:-0.71.1}"
 OUT="${OUT:-dist}"
 CACHE="$OUT/.cache"
