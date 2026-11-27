@@ -21,8 +21,8 @@
 - **Windows 无控制台**：GUI 子系统构建，启动后只有托盘图标，不弹黑框。
 - **实例进程无窗口**：frpc/frps 与 DST 分片均以 `CREATE_NO_WINDOW` 启动，
   输出只写日志文件，启停不会闪黑框。
-- **Mods**：右上角 Mods 按钮搜索 Steam 工坊（关键词搜索可配置 Steam API Key，
-  数字 ID 直接查详情）并加入下载列表（写安装目录
+- **Mods**：右上角 Mods 按钮搜索 Steam 工坊（支持中文关键词，走 Steam 社区镜像，
+  不需要 Steam API Key 或登录；数字 ID 直接查详情）并加入下载列表（写安装目录
   `mods/dedicated_server_mods_setup.lua`）；详情 Mods 用复选框按分片启用
   （写 `modoverrides.lua`），保留已有 `configuration_options` 并自动备份。
 - **新建 DST 集群**：创建时可选“添加已有集群”或“创建新集群”，

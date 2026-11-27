@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -25,14 +26,29 @@ type modSearchResult struct {
 }
 
 var (
-	workshopAnchorRe = regexp.MustCompile(`(?s)<a[^>]+href="https://steamcommunity\.com/sharedfiles/filedetails/\?id=([0-9]+)[^"]*"[^>]*>(.*?)</a>`)
+	workshopAnchorRe = regexp.MustCompile(`(?s)<a[^>]+href="https?://steamcommunity\.com/sharedfiles/filedetails/\?id=([0-9]+)[^"]*"[^>]*>(.*?)</a>`)
 	workshopTitleRe  = regexp.MustCompile(`(?s)class="workshopItemTitle"[^>]*>(.*?)</div>`)
-	workshopImgRe    = regexp.MustCompile(`<img[^>]+src="([^"]+)"`)
+	workshopImgRe    = regexp.MustCompile(`<img[^>]*>`)
+	workshopAltRe    = regexp.MustCompile(`alt="([^"]*)"`)
+	workshopSrcRe    = regexp.MustCompile(`src="([^"]+)"`)
 	htmlTagRe        = regexp.MustCompile(`<[^>]+>`)
 )
 
-var searchClient = &http.Client{Timeout: 15 * time.Second}
-var detailClient = &http.Client{Timeout: 6 * time.Second}
+// workshopMirrors 是 Steam 社区的官方镜像域名。主域 steamcommunity.com 在部分网络被
+// DNS 污染而无法访问，镜像提供同样的工坊搜索页，且不需要登录或 API Key。
+var workshopMirrors = []string{
+	"https://community.steamstatic.com",
+	"https://community.akamai.steamstatic.com",
+	"https://steamcommunity.com",
+}
+
+var (
+	mirrorMu     sync.Mutex
+	mirrorPick   = 0 // 最近一次可用镜像的下标，优先复用
+	searchClient = &http.Client{Timeout: 15 * time.Second}
+	detailClient = &http.Client{Timeout: 6 * time.Second}
+	batchClient  = &http.Client{Timeout: 7 * time.Second}
+)
 
 type publishedFile struct {
 	ID            string `json:"publishedfileid"`
@@ -52,7 +68,6 @@ type publishedResponse struct {
 
 func (s *Server) handleModSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	key := strings.TrimSpace(s.paths.Settings.SteamAPIKey)
 
 	var (
 		results []modSearchResult
@@ -66,20 +81,18 @@ func (s *Server) handleModSearch(w http.ResponseWriter, r *http.Request) {
 			results = []modSearchResult{one}
 			source = "steam-web-api"
 		}
-	} else if key != "" {
-		results, err = steamQueryFiles(key, q)
-		source = "steam-web-api"
 	} else {
-		results, err = scrapeWorkshop(q)
-		source = "steamcommunity"
+		results, source, err = browseWorkshop(q)
+		if err == nil && len(results) > 0 {
+			enrichModResults(results)
+		}
 	}
 	if err != nil {
-		msg := err.Error()
-		if _, isID := numericModID(q); !isID && key == "" {
-			msg += "；可在 Mods 窗口配置 Steam API Key"
-		}
-		fail(w, http.StatusBadGateway, "%s", msg)
+		fail(w, http.StatusBadGateway, "%s", err.Error())
 		return
+	}
+	if results == nil {
+		results = []modSearchResult{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"results": results,
@@ -125,49 +138,103 @@ func steamModDetails(id string) (modSearchResult, error) {
 	return publishedToResult(f), nil
 }
 
-func steamQueryFiles(key, q string) ([]modSearchResult, error) {
-	u, _ := url.Parse("https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/")
-	v := u.Query()
-	v.Set("key", key)
-	v.Set("appid", "322330")
-	v.Set("page", "1")
-	v.Set("numperpage", "30")
-	v.Set("return_vote_data", "true")
-	v.Set("return_children", "true")
-	v.Set("requiredtags[0]", "server_only_mod")
-	v.Set("requiredtags[1]", "all_clients_require_mod")
-	v.Set("match_all_tags", "false")
-	v.Set("language", "0")
-	if q != "" {
-		v.Set("search_text", q)
-	} else {
-		v.Set("query_type", "1")
+// steamBatchDetails 通过公开的 GetPublishedFileDetails 批量取回 Mod 元数据；无需 API Key。
+// 失败时返回 nil，调用方保留网页解析到的信息。
+func steamBatchDetails(ids []string) map[string]publishedFile {
+	if len(ids) == 0 {
+		return nil
 	}
-	u.RawQuery = v.Encode()
-	resp, err := searchClient.Get(u.String())
+	if len(ids) > 30 {
+		ids = ids[:30]
+	}
+	form := url.Values{}
+	form.Set("itemcount", strconv.Itoa(len(ids)))
+	for i, id := range ids {
+		form.Set(fmt.Sprintf("publishedfileids[%d]", i), id)
+	}
+	resp, err := batchClient.PostForm("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/", form)
 	if err != nil {
-		return nil, fmt.Errorf("访问 Steam API 失败: %w", err)
+		return nil
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if resp.StatusCode == http.StatusForbidden {
-		return nil, errors.New("Steam API Key 无效或无权限")
-	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Steam API 返回 %s", resp.Status)
+		return nil
 	}
 	var out publishedResponse
-	if err := json.Unmarshal(body, &out); err != nil {
-		return nil, fmt.Errorf("解析 Steam API 响应失败: %w", err)
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 16<<20)).Decode(&out); err != nil {
+		return nil
 	}
-	results := make([]modSearchResult, 0, len(out.Response.Publishedfiledetails))
+	byID := make(map[string]publishedFile, len(out.Response.Publishedfiledetails))
 	for _, f := range out.Response.Publishedfiledetails {
-		if f.ID == "" || f.Result != 1 {
+		if f.ID != "" && f.Result == 1 {
+			byID[f.ID] = f
+		}
+	}
+	return byID
+}
+
+// enrichModResults 补齐规范标题、预览图、大小、订阅数与更新时间。
+// Steam 对该接口有限流且国内延迟不稳，因此分片并发请求，整体限时，
+// 拿不到就保留网页解析结果，不阻塞搜索。
+func enrichModResults(results []modSearchResult) {
+	ids := make([]string, 0, len(results))
+	for _, r := range results {
+		ids = append(ids, r.ID)
+	}
+	byID := steamBatchDetailsParallel(ids, enrichChunk)
+	if len(byID) == 0 {
+		return
+	}
+	for i := range results {
+		f, ok := byID[results[i].ID]
+		if !ok {
 			continue
 		}
-		results = append(results, publishedToResult(f))
+		if title := strings.TrimSpace(f.Title); title != "" {
+			results[i].Title = title
+		}
+		if preview := strings.TrimSpace(f.Preview); preview != "" {
+			results[i].Preview = preview
+		}
+		if results[i].URL == "" {
+			results[i].URL = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + results[i].ID
+		}
+		size, _ := strconv.ParseInt(f.FileSize, 10, 64)
+		results[i].Size = size
+		results[i].Subscriptions = f.Subscriptions
+		results[i].Updated = f.TimeUpdated
 	}
-	return results, nil
+}
+
+const enrichChunk = 6
+
+func steamBatchDetailsParallel(ids []string, size int) map[string]publishedFile {
+	if size < 1 {
+		size = enrichChunk
+	}
+	var (
+		wg     sync.WaitGroup
+		mu     sync.Mutex
+		merged = map[string]publishedFile{}
+	)
+	for i := 0; i < len(ids); i += size {
+		end := i + size
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunk := ids[i:end]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for id, f := range steamBatchDetails(chunk) {
+				mu.Lock()
+				merged[id] = f
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	return merged
 }
 
 func publishedToResult(f publishedFile) modSearchResult {
@@ -188,17 +255,60 @@ func publishedToResult(f publishedFile) modSearchResult {
 	}
 }
 
-func scrapeWorkshop(q string) ([]modSearchResult, error) {
-	endpoint := "https://steamcommunity.com/workshop/browse/?appid=322330&section=readytouseitems&browsesort=textsearch&searchtext=" + url.QueryEscape(q)
-	if q == "" {
-		endpoint = "https://steamcommunity.com/workshop/browse/?appid=322330&section=readytouseitems&browsesort=trend"
+// browseWorkshop 通过 Steam 社区镜像搜索工坊（支持中文关键词，无需 API Key）。
+// 依次尝试镜像，复用最近可用的那个。
+func browseWorkshop(q string) ([]modSearchResult, string, error) {
+	order := mirrorOrder()
+	var lastErr error
+	for _, idx := range order {
+		host := workshopMirrors[idx]
+		results, err := fetchWorkshopSearch(host, q)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		rememberMirror(idx)
+		return results, "steam-workshop", nil
+	}
+	if lastErr == nil {
+		lastErr = errors.New("无法访问 Steam 工坊")
+	}
+	return nil, "", fmt.Errorf("%w（已尝试 %d 个 Steam 站点）", lastErr, len(order))
+}
+
+func mirrorOrder() []int {
+	mirrorMu.Lock()
+	pick := mirrorPick
+	mirrorMu.Unlock()
+	if pick < 0 || pick >= len(workshopMirrors) {
+		pick = 0
+	}
+	out := make([]int, 0, len(workshopMirrors))
+	for i := range workshopMirrors {
+		out = append(out, (pick+i)%len(workshopMirrors))
+	}
+	return out
+}
+
+func rememberMirror(idx int) {
+	mirrorMu.Lock()
+	mirrorPick = idx
+	mirrorMu.Unlock()
+}
+
+func fetchWorkshopSearch(host, q string) ([]modSearchResult, error) {
+	endpoint := host + "/workshop/browse/?appid=322330&l=chinese&section=readytouseitems"
+	if q != "" {
+		endpoint += "&browsesort=textsearch&searchtext=" + url.QueryEscape(q)
+	} else {
+		endpoint += "&browsesort=trend"
 	}
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) dstlauncher")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
 	resp, err := searchClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("访问 Steam 社区失败: %w", err)
@@ -207,15 +317,11 @@ func scrapeWorkshop(q string) ([]modSearchResult, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Steam 社区返回 %s", resp.Status)
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	if err != nil {
 		return nil, fmt.Errorf("读取 Steam 页面失败: %w", err)
 	}
-	results := parseWorkshopSearch(string(data))
-	if len(results) == 0 {
-		return results, nil
-	}
-	return results, nil
+	return parseWorkshopSearch(string(data)), nil
 }
 
 func parseWorkshopSearch(page string) []modSearchResult {
@@ -226,17 +332,9 @@ func parseWorkshopSearch(page string) []modSearchResult {
 		if seen[id] {
 			continue
 		}
-		titleMatch := workshopTitleRe.FindStringSubmatch(m[2])
-		if titleMatch == nil {
-			continue
-		}
-		title := html.UnescapeString(strings.TrimSpace(htmlTagRe.ReplaceAllString(titleMatch[1], "")))
+		title, preview := workshopItemInfo(m[2])
 		if title == "" {
 			continue
-		}
-		preview := ""
-		if img := workshopImgRe.FindStringSubmatch(m[2]); img != nil {
-			preview = html.UnescapeString(img[1])
 		}
 		seen[id] = true
 		out = append(out, modSearchResult{
@@ -250,4 +348,31 @@ func parseWorkshopSearch(page string) []modSearchResult {
 		}
 	}
 	return out
+}
+
+// workshopItemInfo 兼容工坊列表的两种结构：旧版标题在 div.workshopItemTitle，
+// 新版（React）标题写在缩略图的 alt 属性上。
+func workshopItemInfo(inner string) (string, string) {
+	title, preview := "", ""
+	if img := workshopImgRe.FindString(inner); img != "" {
+		if a := workshopAltRe.FindStringSubmatch(img); a != nil {
+			title = cleanWorkshopText(a[1])
+		}
+		if s := workshopSrcRe.FindStringSubmatch(img); s != nil {
+			preview = strings.TrimSpace(html.UnescapeString(s[1]))
+		}
+	}
+	if t := workshopTitleRe.FindStringSubmatch(inner); t != nil {
+		if cleaned := cleanWorkshopText(t[1]); cleaned != "" {
+			title = cleaned
+		}
+	}
+	return title, preview
+}
+
+func cleanWorkshopText(raw string) string {
+	text := htmlTagRe.ReplaceAllString(raw, " ")
+	text = html.UnescapeString(text)
+	text = strings.ReplaceAll(text, "\u00a0", " ")
+	return strings.TrimSpace(text)
 }

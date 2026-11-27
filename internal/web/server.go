@@ -1174,14 +1174,12 @@ func fail(w http.ResponseWriter, code int, format string, args ...any) {
 func (s *Server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"steamcmdDir": s.paths.Settings.SteamCmdDir,
-		"steamApiKey": s.paths.Settings.SteamAPIKey,
 	})
 }
 
 func (s *Server) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SteamCmdDir *string `json:"steamcmdDir"`
-		SteamAPIKey *string `json:"steamApiKey"`
 	}
 	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
 	dec.DisallowUnknownFields()
@@ -1192,16 +1190,12 @@ func (s *Server) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	if req.SteamCmdDir != nil {
 		s.paths.Settings.SteamCmdDir = strings.TrimSpace(*req.SteamCmdDir)
 	}
-	if req.SteamAPIKey != nil {
-		s.paths.Settings.SteamAPIKey = strings.TrimSpace(*req.SteamAPIKey)
-	}
 	if err := s.paths.SaveSettings(); err != nil {
 		fail(w, http.StatusInternalServerError, "save settings: %v", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
 		"steamcmdDir": s.paths.Settings.SteamCmdDir,
-		"steamApiKey": s.paths.Settings.SteamAPIKey,
 	})
 }
 
