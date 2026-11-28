@@ -6,7 +6,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-VERSION="${VERSION:-0.6.5}"
+VERSION="${VERSION:-0.6.6}"
 FRP_VERSION="${FRP_VERSION:-0.71.1}"
 OUT="${OUT:-dist}"
 CACHE="$OUT/.cache"
@@ -19,6 +19,7 @@ FRP_MIRROR="${FRP_MIRROR-https://ghfast.top/}"
 TARGETS=(
   "linux amd64 amd64"
   "windows amd64 amd64"
+  "linux arm64 arm64"
   "linux arm armv7l 7"
 )
 

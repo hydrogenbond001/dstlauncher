@@ -222,7 +222,10 @@ WINDOWS_CONSOLE=1 ./build.sh
 VERSION=0.2.1 ./build.sh
 ```
 
-- 产物：`dist/dstlauncher_<os>_<arch>/dstlauncher(.exe)`；ARMv7 为 `dist/dstlauncher_linux_armv7l/`。
+- 产物：`dist/dstlauncher_<os>_<label>/dstlauncher(.exe)`；`linux_arm64`（64 位 ARM，
+  树莓派 64 位系统 / ARM 云服务器）与 `linux_armv7l`（32 位 ARM，`GOARM=7`）。
+- ARM 版只能用于 frp 面板管理：SteamCMD 与 DST 服务端只有 x86/x86-64 发布包，
+  ARM 机器上“下载 steamcmd / 启动 DST 服务器”不可用（需要 box86 之类转译层）。
 - frp 发布包缓存在 `dist/.cache/frp_<ver>_<os>_<arch>/`，存在则不联网。
 - 直连 GitHub 失败会自动尝试 `FRP_MIRROR`（默认 `https://ghfast.top/`）。
 - 首次构建需要 Go 模块网络（托盘依赖）；离线时提前 `GOOS=windows go mod download`。

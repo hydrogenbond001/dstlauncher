@@ -72,6 +72,8 @@ jobs:
             "release-assets/dstlauncher-${VERSION}-windows-amd64.exe"
           cp dist/dstlauncher_linux_amd64/dstlauncher \
             "release-assets/dstlauncher-${VERSION}-linux-amd64"
+          cp dist/dstlauncher_linux_arm64/dstlauncher \
+            "release-assets/dstlauncher-${VERSION}-linux-arm64"
           cp dist/dstlauncher_linux_armv7l/dstlauncher \
             "release-assets/dstlauncher-${VERSION}-linux-armv7l"
           cp dist/dstlauncher_linux_amd64/LICENSE-frp.txt release-assets/LICENSE-frp.txt

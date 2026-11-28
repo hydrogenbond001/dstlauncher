@@ -62,10 +62,11 @@ data/                          # 所有运行状态，删掉即恢复初始状�
 # 开发构建（不嵌入 frp，读取 data/bin/ 或 PATH）
 go build -o dstlauncher .
 
-# 发布构建：linux/amd64 + windows/amd64 + linux/armv7l
+# 发布构建：linux/amd64 + windows/amd64 + linux/arm64 + linux/armv7l
 ./build.sh
-# 产物：dist/dstlauncher_<os>_<arch>/dstlauncher(.exe)
-#      armv7l 目录为 dist/dstlauncher_linux_armv7l/
+# 产物：dist/dstlauncher_<os>_<label>/dstlauncher(.exe)
+#      64 位 ARM 为 dist/dstlauncher_linux_arm64/，
+#      32 位 ARM（GOARM=7）为 dist/dstlauncher_linux_armv7l/
 ```
 
 `build.sh` 会按 `FRP_VERSION`（默认 0.71.1）下载对应平台的 frp 发布包，gzip 后
@@ -85,7 +86,7 @@ go build -o dstlauncher .
 - push `main`：`go vet` + `go test` → 构建 linux/windows → 上传 artifacts；
 - push `v*` tag：额外创建/更新 GitHub Release，附
   `dstlauncher-<ver>-windows-amd64.exe`、`dstlauncher-<ver>-linux-amd64`、
-  `dstlauncher-<ver>-linux-armv7l`。
+  `dstlauncher-<ver>-linux-arm64`、`dstlauncher-<ver>-linux-armv7l`。
 - release 任务需要 `contents: write`（工作流已声明），使用内置 `GITHUB_TOKEN`。
 
 裁剪版本：
